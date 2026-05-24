@@ -49,6 +49,7 @@ The app lets you paste a block of text, arm it, and have the app type it for you
 
 On first launch, grant **Accessibility** and **Input Monitoring** to TypingBot in System Settings → Privacy & Security.
 
+## Running the pre-built app
 Download `TypingBot-macOS.zip` from the [Releases](https://github.com/Euler2718e/typingbot/releases) page.
 
 1. Download `TypingBot-macOS.zip`.
