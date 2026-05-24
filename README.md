@@ -24,13 +24,7 @@ The goal is not to be a stealth tool or a shortcut for spam. It is a compact sid
 
 ## Screenshot
 
-Screenshot coming soon.
-
-The intended future path is:
-
-```md
-![TypingBot screenshot](docs/screenshot.png)
-```
+![TypingBot screenshot](screenshot.png)
 
 ## Install
 
