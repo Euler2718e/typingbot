@@ -1,3 +1,4 @@
+NEED COMMAND LINE TOOLS TO RUN IT FOR NOW, IN THE PROCESS OF GETTING APPLE DEV LICENSE
 WORKING ON A WINDOWS VERSION
 
 # TypingBot
@@ -28,6 +29,24 @@ The app lets you paste a block of text, arm it, and have the app type it for you
 ![TypingBot screenshot](screenshot.png)
 
 ## Install
+
+*Run it from source code for now, in the process of getting apple dev license*
+
+## Running from source
+
+**Option A — Command Line Tools (no Xcode needed)**
+1. Install Command Line Tools: `xcode-select --install`
+2. `git clone https://github.com/Euler2718e/typingbot.git`
+3. `cd typingbot && bash build_mac.sh`
+4. `open dist/TypingBot.app`
+
+**Option B — Xcode**
+1. Clone the repo and open the folder in Xcode
+2. Product → Build (⌘B)
+3. Run `bash build_mac.sh` in Terminal to assemble and sign the `.app`
+4. `open dist/TypingBot.app`
+
+On first launch, grant **Accessibility** and **Input Monitoring** to TypingBot in System Settings → Privacy & Security.
 
 Download `TypingBot-macOS.zip` from the [Releases](https://github.com/Euler2718e/typingbot/releases) page.
 
