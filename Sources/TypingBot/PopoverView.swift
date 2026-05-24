@@ -19,13 +19,20 @@ final class PopoverModel: ObservableObject {
 // NSViewRepresentable wrapping NSTextView ensures Cmd+V / Cmd+C / Cmd+A all
 // work correctly inside an NSPopover, regardless of app activation policy.
 
+private class FocusingTextView: NSTextView {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        window?.makeFirstResponder(self)
+    }
+}
+
 struct NativeTextEditor: NSViewRepresentable {
     @Binding var text: String
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let tv = NSTextView()
+        let tv = FocusingTextView()
         tv.isEditable          = true
         tv.isSelectable        = true
         tv.allowsUndo          = true
