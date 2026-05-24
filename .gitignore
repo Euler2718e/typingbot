@@ -1,0 +1,29 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Build products
+build/
+dist/
+*.app
+*.dmg
+*.zip
+
+# Python prototype / local environments
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store
+
+# Local editor / assistant state
+.claude/
+.vscode/
+.idea/
+
+# Logs and temporary files
+*.log
+*.tmp
