@@ -28,7 +28,7 @@ The panel
 
 
 ```md
-<img width="341" height="346" alt="Skjermbilde 2026-05-24 kl  14 30 09" src="https://github.com/user-attachments/assets/2b3d2c10-00c1-455e-87c2-b38e4fa561ee" />
+![TypingBot screenshot](screenshot.png)
 ```
 
 ## Install
