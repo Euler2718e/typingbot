@@ -1,3 +1,5 @@
+WORKING ON A WINDOWS VERSION
+
 # TypingBot
 
 A local macOS menu bar app that types prepared text with human flow and rhythm.
