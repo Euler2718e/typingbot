@@ -25,10 +25,6 @@ The app lets you paste a block of text, arm it, and have the app type it for you
 - Native macOS permissions flow for Accessibility and Input Monitoring.
 - Minimal menu bar UI with local settings persistence.
 
-## Screenshot
-
-![TypingBot screenshot](screenshot.png)
-
 ## Install
 
 *Run it from source code for now, in the process of getting apple dev license*
