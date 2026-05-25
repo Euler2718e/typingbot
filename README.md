@@ -1,6 +1,6 @@
-### NEED COMMAND LINE TOOLS TO RUN IT FOR NOW, IN THE PROCESS OF GETTING APPLE DEV LICENSE
-
-### WORKING ON A WINDOWS VERSION
+<div align="center">
+  <img src="assets/typingbot-banner.png" alt="TypingBot" width="800"/>
+</div>
 
 # TypingBot
 
@@ -8,6 +8,10 @@ A local macOS menu bar app that types prepared text with human flow and rhythm.
 
 The app lets you paste a block of text, arm it, and have the app type it for you - letter by letter. Good for cheating, but only if you already have the text prepared. 
 
+PS:
+#### NEED COMMAND LINE TOOLS TO RUN IT FOR NOW, IN THE PROCESS OF GETTING APPLE DEV LICENSE
+
+#### WORKING ON A WINDOWS VERSION
 
 ## Features
 - "Absorbs" the keyboard, so you can type random things and they won't appear on screen (except the hotkeys, obviously)
@@ -24,6 +28,10 @@ The app lets you paste a block of text, arm it, and have the app type it for you
   - Optional corrected typos and transpositions.
 - Native macOS permissions flow for Accessibility and Input Monitoring.
 - Minimal menu bar UI with local settings persistence.
+
+<div align="center">
+  <img src="assets/screenshot.png" alt="TypingBot screenshot" width="700"/>
+</div>
 
 ## Install
 
