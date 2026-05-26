@@ -115,3 +115,5 @@ TypingBot is a small native macOS app:
 ## License
 
 MIT
+
+***Powered by xLabs***
