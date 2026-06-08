@@ -14,7 +14,6 @@ mkdir -p "${APP_DIR}/Contents/MacOS" "${APP_DIR}/Contents/Resources"
 
 cp "${BIN_PATH}" "${APP_DIR}/Contents/MacOS/${APP_NAME}"
 cp "Info.plist" "${APP_DIR}/Contents/Info.plist"
-cp "assets/icon.png" "${APP_DIR}/Contents/Resources/icon.png"
 
 chmod +x "${APP_DIR}/Contents/MacOS/${APP_NAME}"
 

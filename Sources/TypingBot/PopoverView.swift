@@ -24,6 +24,30 @@ private class FocusingTextView: NSTextView {
         super.viewDidMoveToWindow()
         window?.makeFirstResponder(self)
     }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard flags.contains(.command),
+              let key = event.charactersIgnoringModifiers?.lowercased()
+        else {
+            return super.performKeyEquivalent(with: event)
+        }
+
+        switch key {
+        case "a":
+            selectAll(nil)
+        case "c":
+            copy(nil)
+        case "v":
+            paste(nil)
+        case "x":
+            cut(nil)
+        default:
+            return super.performKeyEquivalent(with: event)
+        }
+
+        return true
+    }
 }
 
 struct NativeTextEditor: NSViewRepresentable {
