@@ -53,18 +53,44 @@ fn validate_settings(settings: &SessionSettings) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn pause_session(controller: tauri::State<SessionController>) -> Result<(), String> {
-    controller.pause()
+fn pause_session(
+    app: tauri::AppHandle,
+    controller: tauri::State<SessionController>,
+) -> Result<(), String> {
+    controller.pause()?;
+    set_control_tray_state(&app, "hold", "TypingBot is paused")
 }
 
 #[tauri::command]
-fn resume_session(controller: tauri::State<SessionController>) -> Result<(), String> {
-    controller.resume()
+fn resume_session(
+    app: tauri::AppHandle,
+    controller: tauri::State<SessionController>,
+) -> Result<(), String> {
+    controller.resume()?;
+    set_control_tray_state(&app, "run", "TypingBot is resuming")
 }
 
 #[tauri::command]
-fn stop_session(controller: tauri::State<SessionController>) -> Result<(), String> {
-    controller.stop()
+fn stop_session(
+    app: tauri::AppHandle,
+    controller: tauri::State<SessionController>,
+) -> Result<(), String> {
+    controller.stop()?;
+    set_control_tray_state(&app, "stop", "TypingBot was stopped")
+}
+
+fn set_control_tray_state(
+    app: &tauri::AppHandle,
+    title: &str,
+    tooltip: &str,
+) -> Result<(), String> {
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        tray.set_title(Some(format!(" {title}")))
+            .map_err(|error| error.to_string())?;
+        tray.set_tooltip(Some(tooltip))
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
