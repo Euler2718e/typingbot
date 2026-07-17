@@ -34,7 +34,26 @@ It is built for writing demonstrations, accessibility workflows, rehearsals, and
 3. Open the download and install TypingBot.
 4. On macOS, grant Accessibility permission when prompted. On Linux, input simulation is most reliable in an X11 session.
 
-Unsigned development releases can trigger an operating-system warning. Signing instructions are tracked separately from the application and require platform developer certificates.
+### macOS says Apple could not verify TypingBot
+
+TypingBot's current Mac builds have a valid ad-hoc signature, but Apple has not notarized them. Only continue if you downloaded the app from this private repository or built it yourself.
+
+1. Move `TypingBot.app` into your Applications folder and try to open it once.
+2. Select **Done** on the warning. Do not select **Move to Bin**.
+3. Open **System Settings → Privacy & Security**.
+4. Scroll to **Security**, select **Open Anyway** beside TypingBot, authenticate, then select **Open**. Apple makes this button available for about one hour after the blocked launch.
+
+This approves only TypingBot. It does not turn off Gatekeeper. Apple documents the same flow in [Safely open apps on your Mac](https://support.apple.com/en-us/102445).
+
+If **Open Anyway** is missing or an older TypingBot download still fails, use the included repair tool from a cloned copy of this repository:
+
+```bash
+./scripts/repair-macos-app.sh "/Applications/TypingBot.app"
+```
+
+The tool refuses apps with a different bundle ID, repairs the incomplete ad-hoc signature used by older builds, removes quarantine from TypingBot only, verifies the result, and opens it. It never changes system-wide security settings.
+
+Warning-free double-click installation requires an Apple Developer ID certificate and Apple notarization. Those private credentials are intentionally not stored in the repository.
 
 ## Use
 

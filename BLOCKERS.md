@@ -8,7 +8,7 @@ The application and release workflows can build macOS, Windows, and Linux packag
 - Windows warning-free distribution needs a trusted code-signing certificate.
 - These credentials must be stored as GitHub Actions secrets and must never be committed.
 
-Until signing is configured, users may see an operating-system warning and need to use the documented manual-open flow.
+Mac builds now receive a complete ad-hoc signature and pass `codesign --verify --deep --strict`. Users may still see Gatekeeper's unidentified-developer warning and need the documented **Open Anyway** flow. `scripts/repair-macos-app.sh` repairs older app bundles without disabling Gatekeeper globally.
 
 ## Local DMG wrapper
 
