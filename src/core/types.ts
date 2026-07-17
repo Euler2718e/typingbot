@@ -1,6 +1,8 @@
 export const SCRIPT_VERSION = "1.0" as const;
 
 export type Phase = "planning" | "drafting" | "polishing";
+export type RhythmProfile = "steady" | "natural" | "reflective";
+export type RevisionDensity = "light" | "balanced" | "deep";
 
 export interface PerformanceScript {
   version: typeof SCRIPT_VERSION;
@@ -31,6 +33,16 @@ export interface SessionSettings {
   draftingPercent: number;
   polishingPercent: number;
   correctedTypos: boolean;
+  rhythmProfile: RhythmProfile;
+  variationPercent: number;
+  hesitationPercent: number;
+  typosPerThousand: number;
+  correctionDelayMs: number;
+  editPauseMs: number;
+}
+
+export interface PromptPreferences {
+  revisionDensity: RevisionDensity;
 }
 
 export interface ValidationResult {
