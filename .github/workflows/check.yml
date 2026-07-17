@@ -25,3 +25,8 @@ jobs:
       - run: bun test
       - run: bun run build
       - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Build and verify macOS app bundle
+        if: runner.os == 'macOS'
+        run: |
+          bun run tauri build --bundles app
+          codesign --verify --deep --strict --verbose=2 src-tauri/target/release/bundle/macos/TypingBot.app
