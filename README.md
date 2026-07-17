@@ -11,6 +11,7 @@ It is built for writing demonstrations, accessibility workflows, rehearsals, and
 ## What it does
 
 - Runs on macOS, Windows, and Linux through Tauri.
+- Lives in the macOS menu bar as a 440-pixel utility panel instead of a conventional app window or Dock presence; Windows and Linux use the system tray.
 - Types into ordinary desktop and browser text fields.
 - Shows rough lowercase planning before the main draft.
 - Supports append, exact replacement, deletion, movement, clearing, and timed rereading.
@@ -18,6 +19,7 @@ It is built for writing demonstrations, accessibility workflows, rehearsals, and
 - Varies speed with short bursts, hesitation, punctuation pauses, and corrected transient typos.
 - Simulates every edit locally and requires an exact match with the supplied final text.
 - Locks onto the destination application and pauses when focus changes.
+- Shows compact live progress beside the menu-bar icon without requiring the panel to stay open.
 - Provides `Cmd/Ctrl + Alt + Space` as a global pause and resume shortcut.
 - Makes no network requests and does not require an account.
 
@@ -63,12 +65,15 @@ Warning-free double-click installation requires an Apple Developer ID certificat
 4. Copy only the JSON object returned by the model.
 5. Paste it into **Model output** in TypingBot.
 6. Choose the total duration, average WPM, countdown, and phase percentages.
-7. Select **Validate and play**.
-8. During the countdown, focus the destination textbox.
+7. Open **Feel** to choose steady, natural, or reflective rhythm and tune speed variation, hesitation, corrected-typo frequency, correction delay, and pause-before-edit timing.
+8. Select **Validate and play**.
+9. During the countdown, focus the destination textbox.
 
 TypingBot hides its window, captures the foreground application as the destination, then begins. Switching to another application pauses the session. Refocus the original application and use `Cmd/Ctrl + Alt + Space` or the app controls to resume.
 
 Physical keyboard input is never blocked. Do not type into the destination during playback because TypingBot cannot reliably inspect arbitrary third-party textbox contents.
+
+The **Revision depth** control changes the copied model prompt. Deep mode requests substantially more sentence rewrites, discarded lines, paragraph deletion, and material movement; it does not simply slow down the same final-text append.
 
 ## Performance language
 
