@@ -35,6 +35,9 @@
     "category": "Productivity",
     "shortDescription": "Local writing-process playback",
     "longDescription": "Build and play transparent planning, drafting, and polishing demonstrations in any desktop text field.",
-    "copyright": "Copyright 2026 Euler2718e"
+    "copyright": "Copyright 2026 Euler2718e",
+    "macOS": {
+      "signingIdentity": "-"
+    }
   }
 }
