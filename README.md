@@ -25,37 +25,44 @@ It is built for writing demonstrations, accessibility workflows, rehearsals, and
 
 ## Install
 
-### Normal installation
+### macOS: install from Terminal
+
+The Terminal installer is the primary Mac installation path until TypingBot has an Apple-notarized release. It avoids the blocked double-click flow without disabling Gatekeeper, changing a system security setting, or requiring an administrator password.
+
+1. Open the repository's **Releases** page.
+2. Download `install-macos.sh` and the newest Mac disk image:
+   - Apple Silicon (`M1`, `M2`, `M3`, `M4`, or newer): the `aarch64.dmg`
+   - Intel: the `x64.dmg`
+3. Open **Terminal**.
+4. Type `zsh `, including the trailing space.
+5. Drag `install-macos.sh` from Downloads into Terminal.
+6. Type one space, then drag the downloaded `.dmg` into Terminal.
+7. Press Return.
+
+The installer accepts a `.dmg`, `.zip`, or `.app`. It checks the bundle identifier, executable, and internal code-signature integrity; installs to `~/Applications/TypingBot.app`; removes quarantine from that copy only; registers it with macOS; and opens it as a menu-bar utility. It refuses a damaged signature or an existing destination that is not TypingBot.
+
+Only use the installer and app downloaded from this private repository. An ad-hoc signature verifies that the bundle was not accidentally damaged after signing; unlike Apple notarization, it does not establish a public developer identity.
+
+On first use, macOS will still ask you to grant TypingBot **Accessibility** permission. That permission is required for local typing into another application and is separate from the opening warning.
+
+For a local source build, the same installer needs no file argument:
+
+```bash
+./scripts/install-macos.sh
+```
+
+The older `scripts/repair-macos-app.sh` remains available only for repairing an incomplete signature on a legacy TypingBot app bundle.
+
+There is no honest Terminal trick that makes an unidentified download universally trusted. Warning-free double-click installation on unmanaged Macs requires an Apple Developer ID certificate and Apple notarization; organization-managed Macs may impose additional policy. Those private credentials are intentionally not stored in the repository.
+
+### Windows and Linux
 
 1. Open the repository's **Releases** page.
 2. Download the newest file for your computer:
-   - macOS Apple Silicon: the `aarch64.dmg`
-   - macOS Intel: the `x64.dmg`
    - Windows: the `.msi` or setup `.exe`
    - Linux: the `.AppImage` or `.deb`
 3. Open the download and install TypingBot.
-4. On macOS, grant Accessibility permission when prompted. On Linux, input simulation is most reliable in an X11 session.
-
-### macOS says Apple could not verify TypingBot
-
-TypingBot's current Mac builds have a valid ad-hoc signature, but Apple has not notarized them. Only continue if you downloaded the app from this private repository or built it yourself.
-
-1. Move `TypingBot.app` into your Applications folder and try to open it once.
-2. Select **Done** on the warning. Do not select **Move to Bin**.
-3. Open **System Settings → Privacy & Security**.
-4. Scroll to **Security**, select **Open Anyway** beside TypingBot, authenticate, then select **Open**. Apple makes this button available for about one hour after the blocked launch.
-
-This approves only TypingBot. It does not turn off Gatekeeper. Apple documents the same flow in [Safely open apps on your Mac](https://support.apple.com/en-us/102445).
-
-If **Open Anyway** is missing or an older TypingBot download still fails, use the included repair tool from a cloned copy of this repository:
-
-```bash
-./scripts/repair-macos-app.sh "/Applications/TypingBot.app"
-```
-
-The tool refuses apps with a different bundle ID, repairs the incomplete ad-hoc signature used by older builds, removes quarantine from TypingBot only, verifies the result, and opens it. It never changes system-wide security settings.
-
-Warning-free double-click installation requires an Apple Developer ID certificate and Apple notarization. Those private credentials are intentionally not stored in the repository.
+4. On Linux, input simulation is most reliable in an X11 session.
 
 ## Use
 
