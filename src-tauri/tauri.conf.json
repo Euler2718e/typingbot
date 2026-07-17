@@ -15,14 +15,15 @@
       {
         "label": "main",
         "title": "TypingBot",
-        "width": 760,
-        "height": 720,
-        "minWidth": 620,
-        "minHeight": 600,
-        "resizable": true,
-        "center": true,
-        "visible": true,
-        "decorations": true
+        "width": 440,
+        "height": 680,
+        "resizable": false,
+        "center": false,
+        "visible": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": true
       }
     ],
     "security": {
