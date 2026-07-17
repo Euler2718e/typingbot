@@ -135,7 +135,7 @@ case "$source_path" in
     ;;
 esac
 
-verify_bundle() {
+verify_identity() {
   local app_path="$1"
   local info_plist="$app_path/Contents/Info.plist"
   local executable="$app_path/Contents/MacOS/typingbot"
@@ -147,7 +147,11 @@ verify_bundle() {
   bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info_plist" 2>/dev/null || true)"
   [[ "$bundle_id" == "$expected_bundle_id" ]] || \
     fail "refusing an app with bundle ID '$bundle_id'"
+}
 
+verify_bundle() {
+  local app_path="$1"
+  verify_identity "$app_path"
   /usr/bin/codesign --verify --deep --strict "$app_path" >/dev/null 2>&1 || \
     fail "the app signature is damaged; download a fresh TypingBot release"
 }
@@ -171,7 +175,7 @@ verify_bundle "$staged_app"
 if [[ -e "$destination" ]]; then
   [[ -d "$destination" && ! -L "$destination" ]] || \
     fail "refusing to replace a non-application item at: $destination"
-  verify_bundle "$destination"
+  verify_identity "$destination"
   /usr/bin/osascript -e 'tell application id "app.typingbot.desktop" to quit' >/dev/null 2>&1 || true
   previous_app="$staging_dir/TypingBot.previous.app"
   /bin/mv "$destination" "$previous_app"
