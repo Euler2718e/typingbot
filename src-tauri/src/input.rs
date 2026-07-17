@@ -47,7 +47,8 @@ impl InputDriver {
             if self.corrected_typos {
                 if let Some(wrong) = adjacent_typo(grapheme, self.typo_probability, &mut rng) {
                     self.enigo.text(&wrong).map_err(|error| error.to_string())?;
-                    let correction_delay = randomize_duration(self.correction_delay_ms, 0.35, &mut rng);
+                    let correction_delay =
+                        randomize_duration(self.correction_delay_ms, 0.35, &mut rng);
                     interruptible_sleep(correction_delay, &mut gate)?;
                     self.backspace()?;
                     interruptible_sleep(randomize_duration(70, 0.35, &mut rng), &mut gate)?;

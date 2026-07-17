@@ -1,13 +1,17 @@
-mod input;
-mod model;
-mod session;
+pub mod input;
+pub mod model;
+pub mod protocol;
+pub mod session;
 
-use model::{validate_and_simulate, PerformanceScript, SessionSettings};
-use session::SessionController;
+use model::{
+    validate_and_simulate, validate_settings, PerformanceScript, SessionSettings, SessionStatus,
+};
+use session::{SessionController, StatusEmitter};
+use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, PhysicalPosition, Rect,
+    Emitter, Manager, PhysicalPosition, Rect,
 };
 
 const TRAY_ID: &str = "typingbot-status";
@@ -26,30 +30,9 @@ fn start_session(
 ) -> Result<(), String> {
     validate_and_simulate(&script)?;
     validate_settings(&settings)?;
-    controller.start(app, script, settings)
-}
-
-fn validate_settings(settings: &SessionSettings) -> Result<(), String> {
-    let split = settings.planning_percent + settings.drafting_percent + settings.polishing_percent;
-    if (split - 100.0).abs() > 0.01 {
-        return Err("phase percentages must total 100".into());
-    }
-    if !(1.0..=480.0).contains(&settings.duration_minutes) {
-        return Err("duration must be between 1 and 480 minutes".into());
-    }
-    if !(20..=220).contains(&settings.wpm) {
-        return Err("typing speed must be between 20 and 220 WPM".into());
-    }
-    if settings.variation_percent > 100 || settings.hesitation_percent > 100 {
-        return Err("variation and hesitation must be between 0 and 100".into());
-    }
-    if settings.typos_per_thousand > 50 {
-        return Err("typo frequency must be between 0 and 50 per thousand characters".into());
-    }
-    if !(40..=1200).contains(&settings.correction_delay_ms) || settings.edit_pause_ms > 3000 {
-        return Err("correction and edit pause timing is outside the supported range".into());
-    }
-    Ok(())
+    let status_app = app.clone();
+    let emitter: StatusEmitter = Arc::new(move |status| emit_tauri_status(&status_app, status));
+    controller.start(emitter, script, settings)
 }
 
 #[tauri::command]
@@ -91,6 +74,46 @@ fn set_control_tray_state(
             .map_err(|error| error.to_string())?;
     }
     Ok(())
+}
+
+fn emit_tauri_status(app: &tauri::AppHandle, status: SessionStatus) {
+    update_tray_status(app, &status);
+    let _ = app.emit("session-status", status);
+}
+
+fn update_tray_status(app: &tauri::AppHandle, status: &SessionStatus) {
+    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+        return;
+    };
+    let title = tray_status_title(&status.state, status.elapsed_ms, status.target_duration_ms);
+    let tooltip = match status.state.as_str() {
+        "running" => format!("TypingBot is active: {}", status.message),
+        "paused" => format!("TypingBot is paused: {}", status.message),
+        "countdown" => "TypingBot is waiting for a destination".into(),
+        "completed" => "TypingBot finished successfully".into(),
+        "error" => format!("TypingBot needs attention: {}", status.message),
+        _ => "TypingBot is ready".into(),
+    };
+    let _ = tray.set_title(title.as_deref());
+    let _ = tray.set_tooltip(Some(tooltip));
+}
+
+fn tray_status_title(state: &str, elapsed_ms: u64, target_duration_ms: u64) -> Option<String> {
+    match state {
+        "countdown" => Some(" wait".into()),
+        "running" => {
+            let percent = if target_duration_ms == 0 {
+                0
+            } else {
+                (elapsed_ms.saturating_mul(100) / target_duration_ms).min(100)
+            };
+            Some(format!(" {percent}%"))
+        }
+        "paused" => Some(" hold".into()),
+        "completed" => Some(" done".into()),
+        "error" => Some(" err".into()),
+        _ => None,
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -143,23 +166,25 @@ pub fn run() {
                 .build(app)?;
             Ok(())
         })
-        .on_window_event(|window, event| {
-            match event {
-                tauri::WindowEvent::CloseRequested { api, .. } => {
-                    let _ = window.hide();
-                    api.prevent_close();
-                }
-                tauri::WindowEvent::Focused(false) => {
-                    let _ = window.hide();
-                }
-                _ => {}
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
+                let _ = window.hide();
+                api.prevent_close();
             }
+            tauri::WindowEvent::Focused(false) => {
+                let _ = window.hide();
+            }
+            _ => {}
         })
         .run(tauri::generate_context!())
         .expect("error while running TypingBot");
 }
 
-fn toggle_panel(app: &tauri::AppHandle, rect: Rect, click: PhysicalPosition<f64>) -> tauri::Result<()> {
+fn toggle_panel(
+    app: &tauri::AppHandle,
+    rect: Rect,
+    click: PhysicalPosition<f64>,
+) -> tauri::Result<()> {
     let Some(window) = app.get_webview_window("main") else {
         return Ok(());
     };
@@ -179,7 +204,8 @@ fn toggle_panel(app: &tauri::AppHandle, rect: Rect, click: PhysicalPosition<f64>
         let monitor_size = monitor.size();
         let margin = (8.0 * scale) as i32;
         let centered_x = tray_position.x + tray_size.width as i32 / 2 - panel_size.width as i32 / 2;
-        let max_x = monitor_position.x + monitor_size.width as i32 - panel_size.width as i32 - margin;
+        let max_x =
+            monitor_position.x + monitor_size.width as i32 - panel_size.width as i32 - margin;
         let x = centered_x.clamp(monitor_position.x + margin, max_x);
         let tray_is_below_center =
             tray_position.y > monitor_position.y + monitor_size.height as i32 / 2;

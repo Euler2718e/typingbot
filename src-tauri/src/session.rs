@@ -12,17 +12,16 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-use tauri::{AppHandle, Emitter};
-
-use crate::TRAY_ID;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ControlState {
+pub enum ControlState {
     Idle,
     Running,
     Paused,
     Stopped,
 }
+
+pub type StatusEmitter = Arc<dyn Fn(SessionStatus) + Send + Sync + 'static>;
 
 #[derive(Clone)]
 pub struct SessionController {
@@ -40,7 +39,7 @@ impl Default for SessionController {
 impl SessionController {
     pub fn start(
         &self,
-        app: AppHandle,
+        emitter: StatusEmitter,
         script: PerformanceScript,
         settings: SessionSettings,
     ) -> Result<(), String> {
@@ -54,8 +53,8 @@ impl SessionController {
         }
         let controller = self.clone();
         thread::spawn(move || {
-            if let Err(error) = controller.run(app.clone(), script, settings) {
-                controller.emit(&app, "error", None, 0, 0, 0, 0, error, None);
+            if let Err(error) = controller.run(&emitter, script, settings) {
+                controller.emit(&emitter, "error", None, 0, 0, 0, 0, error, None);
             }
             let (lock, _) = &*controller.shared;
             if let Ok(mut state) = lock.lock() {
@@ -92,9 +91,30 @@ impl SessionController {
         Ok(())
     }
 
+    pub fn state(&self) -> Result<ControlState, String> {
+        let (lock, _) = &*self.shared;
+        lock.lock()
+            .map(|state| *state)
+            .map_err(|_| "session lock is poisoned".into())
+    }
+
+    pub fn toggle_pause(&self) -> Result<ControlState, String> {
+        match self.state()? {
+            ControlState::Running => {
+                self.pause()?;
+                Ok(ControlState::Paused)
+            }
+            ControlState::Paused => {
+                self.resume()?;
+                Ok(ControlState::Running)
+            }
+            state => Ok(state),
+        }
+    }
+
     fn run(
         &self,
-        app: AppHandle,
+        emitter: &StatusEmitter,
         script: PerformanceScript,
         settings: SessionSettings,
     ) -> Result<(), String> {
@@ -103,7 +123,7 @@ impl SessionController {
         for second in (1..=settings.countdown_seconds).rev() {
             self.ensure_running()?;
             self.emit(
-                &app,
+                emitter,
                 "countdown",
                 None,
                 0,
@@ -138,7 +158,7 @@ impl SessionController {
                 phase_started = Instant::now();
             }
             self.wait_until_ready(
-                &app,
+                emitter,
                 &target,
                 action.phase(),
                 index,
@@ -147,7 +167,7 @@ impl SessionController {
                 target_ms,
             )?;
             self.emit(
-                &app,
+                emitter,
                 "running",
                 Some(action.phase().clone()),
                 index,
@@ -163,7 +183,7 @@ impl SessionController {
 
             self.apply_action(&mut input, action, &mut document, &mut cursor, || {
                 self.wait_until_ready(
-                    &app,
+                    emitter,
                     &target,
                     action.phase(),
                     index,
@@ -181,7 +201,7 @@ impl SessionController {
             let elapsed = phase_started.elapsed().as_millis() as u64;
             self.interruptible_sleep(
                 desired.saturating_sub(elapsed),
-                &app,
+                emitter,
                 &target,
                 action.phase(),
                 index,
@@ -195,7 +215,7 @@ impl SessionController {
             return Err("Internal document mirror diverged before completion".into());
         }
         self.emit(
-            &app,
+            emitter,
             "completed",
             Some(Phase::Polishing),
             action_count,
@@ -278,7 +298,7 @@ impl SessionController {
     #[allow(clippy::too_many_arguments)]
     fn wait_until_ready(
         &self,
-        app: &AppHandle,
+        emitter: &StatusEmitter,
         target: &ActiveWindow,
         phase: &Phase,
         action_index: usize,
@@ -295,7 +315,7 @@ impl SessionController {
                 *state = ControlState::Paused;
             }
             self.emit(
-                app,
+                emitter,
                 "paused",
                 Some(phase.clone()),
                 action_index,
@@ -310,7 +330,7 @@ impl SessionController {
                 get_active_window().map_err(|_| "Could not read the focused application")?;
             if refocused.process_id != target.process_id {
                 return self.wait_until_ready(
-                    app,
+                    emitter,
                     target,
                     phase,
                     action_index,
@@ -327,7 +347,7 @@ impl SessionController {
     fn interruptible_sleep(
         &self,
         milliseconds: u64,
-        app: &AppHandle,
+        emitter: &StatusEmitter,
         target: &ActiveWindow,
         phase: &Phase,
         action_index: usize,
@@ -338,7 +358,7 @@ impl SessionController {
         let until = Instant::now() + Duration::from_millis(milliseconds);
         while Instant::now() < until {
             self.wait_until_ready(
-                app,
+                emitter,
                 target,
                 phase,
                 action_index,
@@ -355,7 +375,7 @@ impl SessionController {
     #[allow(clippy::too_many_arguments)]
     fn emit(
         &self,
-        app: &AppHandle,
+        emitter: &StatusEmitter,
         state: &str,
         phase: Option<Phase>,
         action_index: usize,
@@ -365,61 +385,16 @@ impl SessionController {
         message: String,
         target_application: Option<String>,
     ) {
-        update_tray_status(app, state, elapsed_ms, target_duration_ms, &message);
-        let _ = app.emit(
-            "session-status",
-            SessionStatus {
-                state: state.into(),
-                phase,
-                action_index,
-                action_count,
-                elapsed_ms,
-                target_duration_ms,
-                message,
-                target_application,
-            },
-        );
-    }
-}
-
-fn update_tray_status(
-    app: &AppHandle,
-    state: &str,
-    elapsed_ms: u64,
-    target_duration_ms: u64,
-    message: &str,
-) {
-    let Some(tray) = app.tray_by_id(TRAY_ID) else {
-        return;
-    };
-    let title = tray_status_title(state, elapsed_ms, target_duration_ms);
-    let tooltip = match state {
-        "running" => format!("TypingBot is active: {message}"),
-        "paused" => format!("TypingBot is paused: {message}"),
-        "countdown" => "TypingBot is waiting for a destination".into(),
-        "completed" => "TypingBot finished successfully".into(),
-        "error" => format!("TypingBot needs attention: {message}"),
-        _ => "TypingBot is ready".into(),
-    };
-    let _ = tray.set_title(title.as_deref());
-    let _ = tray.set_tooltip(Some(tooltip));
-}
-
-fn tray_status_title(state: &str, elapsed_ms: u64, target_duration_ms: u64) -> Option<String> {
-    match state {
-        "countdown" => Some(" wait".into()),
-        "running" => {
-            let percent = if target_duration_ms == 0 {
-                0
-            } else {
-                (elapsed_ms.saturating_mul(100) / target_duration_ms).min(100)
-            };
-            Some(format!(" {percent}%"))
-        }
-        "paused" => Some(" hold".into()),
-        "completed" => Some(" done".into()),
-        "error" => Some(" err".into()),
-        _ => None,
+        emitter(SessionStatus {
+            state: state.into(),
+            phase,
+            action_index,
+            action_count,
+            elapsed_ms,
+            target_duration_ms,
+            message,
+            target_application,
+        });
     }
 }
 
@@ -479,16 +454,4 @@ fn phase_efforts(actions: &[Action]) -> HashMap<Phase, u64> {
         *result.entry(action.phase().clone()).or_default() += action.effort();
     }
     result
-}
-
-#[cfg(test)]
-mod tests {
-    use super::tray_status_title;
-
-    #[test]
-    fn tray_title_reports_subtle_progress() {
-        assert_eq!(tray_status_title("running", 15_000, 60_000), Some(" 25%".into()));
-        assert_eq!(tray_status_title("paused", 0, 0), Some(" hold".into()));
-        assert_eq!(tray_status_title("idle", 0, 0), None);
-    }
 }
