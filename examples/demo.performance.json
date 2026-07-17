@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "title": "revision demo",
+  "finalText": "Good writing rarely arrives in one pass. Ideas are tested, sentences are reshaped, and structure becomes clearer through revision.",
+  "actions": [
+    {
+      "op": "append",
+      "phase": "planning",
+      "text": "main point: writing changes\nmaybe start with the finished sentence?\nno, focus on revision",
+      "effort": 3,
+      "note": "Gathering the central idea"
+    },
+    {
+      "op": "pause",
+      "phase": "planning",
+      "effort": 2,
+      "note": "Considering the opening"
+    },
+    {
+      "op": "clear",
+      "phase": "drafting",
+      "effort": 1,
+      "note": "Starting the draft"
+    },
+    {
+      "op": "append",
+      "phase": "drafting",
+      "text": "Good writing arrives in one pass. Ideas are tested, sentences are reshaped, and structure becomes clearer through revision.",
+      "effort": 5,
+      "note": "Writing the first complete pass"
+    },
+    {
+      "op": "append",
+      "phase": "drafting",
+      "text": "\n\nRevision turns thinking into clearer work.",
+      "effort": 2,
+      "note": "Trying an extra conclusion"
+    },
+    {
+      "op": "delete",
+      "phase": "drafting",
+      "find": "\n\nRevision turns thinking into clearer work.",
+      "effort": 2,
+      "note": "Removing a repeated idea"
+    },
+    {
+      "op": "replace",
+      "phase": "polishing",
+      "find": "writing arrives",
+      "text": "writing rarely arrives",
+      "effort": 3,
+      "note": "Making the claim precise"
+    },
+    {
+      "op": "pause",
+      "phase": "polishing",
+      "effort": 2,
+      "note": "Final proofread"
+    }
+  ]
+}
