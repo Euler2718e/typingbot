@@ -30,3 +30,7 @@ jobs:
         run: |
           bun run tauri build --bundles app
           codesign --verify --deep --strict --verbose=2 src-tauri/target/release/bundle/macos/TypingBot.app
+          ./scripts/install-macos.sh src-tauri/target/release/bundle/macos/TypingBot.app \
+            --destination "$RUNNER_TEMP/Applications/TypingBot.app" \
+            --no-open
+          codesign --verify --deep --strict --verbose=2 "$RUNNER_TEMP/Applications/TypingBot.app"
