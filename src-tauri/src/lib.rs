@@ -25,6 +25,11 @@ fn start_session(
     settings: SessionSettings,
 ) -> Result<(), String> {
     validate_and_simulate(&script)?;
+    validate_settings(&settings)?;
+    controller.start(app, script, settings)
+}
+
+fn validate_settings(settings: &SessionSettings) -> Result<(), String> {
     let split = settings.planning_percent + settings.drafting_percent + settings.polishing_percent;
     if (split - 100.0).abs() > 0.01 {
         return Err("phase percentages must total 100".into());
@@ -32,7 +37,19 @@ fn start_session(
     if !(1.0..=480.0).contains(&settings.duration_minutes) {
         return Err("duration must be between 1 and 480 minutes".into());
     }
-    controller.start(app, script, settings)
+    if !(20..=220).contains(&settings.wpm) {
+        return Err("typing speed must be between 20 and 220 WPM".into());
+    }
+    if settings.variation_percent > 100 || settings.hesitation_percent > 100 {
+        return Err("variation and hesitation must be between 0 and 100".into());
+    }
+    if settings.typos_per_thousand > 50 {
+        return Err("typo frequency must be between 0 and 50 per thousand characters".into());
+    }
+    if !(40..=1200).contains(&settings.correction_delay_ms) || settings.edit_pause_ms > 3000 {
+        return Err("correction and edit pause timing is outside the supported range".into());
+    }
+    Ok(())
 }
 
 #[tauri::command]

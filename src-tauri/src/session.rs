@@ -128,7 +128,7 @@ impl SessionController {
         let mut current_phase = script.actions[0].phase().clone();
         let mut document = String::new();
         let mut cursor = 0usize;
-        let mut input = InputDriver::new(settings.wpm, settings.corrected_typos)?;
+        let mut input = InputDriver::new(&settings)?;
 
         for (index, action) in script.actions.iter().enumerate() {
             if *action.phase() != current_phase {
@@ -225,6 +225,7 @@ impl SessionController {
                 document.push_str(text);
             }
             Action::Clear { .. } => {
+                input.pause_before_edit(&mut gate)?;
                 input.select_all()?;
                 input.backspace()?;
                 document.clear();
@@ -232,12 +233,15 @@ impl SessionController {
             }
             Action::Pause { .. } => {}
             Action::Replace { find, text, .. } => {
+                input.pause_before_edit(&mut gate)?;
                 replace_visible(input, document, cursor, find, text, &mut gate)?;
             }
             Action::Delete { find, .. } => {
+                input.pause_before_edit(&mut gate)?;
                 replace_visible(input, document, cursor, find, "", &mut gate)?;
             }
             Action::Move { find, after, .. } => {
+                input.pause_before_edit(&mut gate)?;
                 let moved = find.clone();
                 replace_visible(input, document, cursor, find, "", &mut gate)?;
                 let byte_index = match after {

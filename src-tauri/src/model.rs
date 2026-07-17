@@ -18,6 +18,20 @@ pub enum Phase {
     Polishing,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum RhythmProfile {
+    Steady,
+    Natural,
+    Reflective,
+}
+
+impl Default for RhythmProfile {
+    fn default() -> Self {
+        Self::Natural
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum Action {
@@ -104,6 +118,38 @@ pub struct SessionSettings {
     pub drafting_percent: f64,
     pub polishing_percent: f64,
     pub corrected_typos: bool,
+    #[serde(default)]
+    pub rhythm_profile: RhythmProfile,
+    #[serde(default = "default_variation_percent")]
+    pub variation_percent: u8,
+    #[serde(default = "default_hesitation_percent")]
+    pub hesitation_percent: u8,
+    #[serde(default = "default_typos_per_thousand")]
+    pub typos_per_thousand: u8,
+    #[serde(default = "default_correction_delay_ms")]
+    pub correction_delay_ms: u64,
+    #[serde(default = "default_edit_pause_ms")]
+    pub edit_pause_ms: u64,
+}
+
+fn default_variation_percent() -> u8 {
+    62
+}
+
+fn default_hesitation_percent() -> u8 {
+    54
+}
+
+fn default_typos_per_thousand() -> u8 {
+    12
+}
+
+fn default_correction_delay_ms() -> u64 {
+    180
+}
+
+fn default_edit_pause_ms() -> u64 {
+    520
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -264,5 +310,24 @@ mod tests {
     fn counts_graphemes_for_cursor_navigation() {
         assert_eq!(grapheme_count("a👨‍👩‍👧‍👦b"), 3);
         assert_eq!(grapheme_index("aé", 1), 1);
+    }
+
+    #[test]
+    fn supplies_cadence_defaults_for_saved_legacy_settings() {
+        let settings: SessionSettings = serde_json::from_value(serde_json::json!({
+            "durationMinutes": 60,
+            "wpm": 85,
+            "countdownSeconds": 7,
+            "planningPercent": 15,
+            "draftingPercent": 60,
+            "polishingPercent": 25,
+            "correctedTypos": true
+        }))
+        .expect("legacy settings should remain readable");
+
+        assert_eq!(settings.rhythm_profile, RhythmProfile::Natural);
+        assert_eq!(settings.variation_percent, 62);
+        assert_eq!(settings.typos_per_thousand, 12);
+        assert_eq!(settings.edit_pause_ms, 520);
     }
 }
