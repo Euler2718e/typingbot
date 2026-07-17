@@ -14,6 +14,8 @@ use std::{
 };
 use tauri::{AppHandle, Emitter};
 
+use crate::TRAY_ID;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ControlState {
     Idle,
@@ -363,6 +365,7 @@ impl SessionController {
         message: String,
         target_application: Option<String>,
     ) {
+        update_tray_status(app, state, elapsed_ms, target_duration_ms, &message);
         let _ = app.emit(
             "session-status",
             SessionStatus {
@@ -376,6 +379,47 @@ impl SessionController {
                 target_application,
             },
         );
+    }
+}
+
+fn update_tray_status(
+    app: &AppHandle,
+    state: &str,
+    elapsed_ms: u64,
+    target_duration_ms: u64,
+    message: &str,
+) {
+    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+        return;
+    };
+    let title = tray_status_title(state, elapsed_ms, target_duration_ms);
+    let tooltip = match state {
+        "running" => format!("TypingBot is active: {message}"),
+        "paused" => format!("TypingBot is paused: {message}"),
+        "countdown" => "TypingBot is waiting for a destination".into(),
+        "completed" => "TypingBot finished successfully".into(),
+        "error" => format!("TypingBot needs attention: {message}"),
+        _ => "TypingBot is ready".into(),
+    };
+    let _ = tray.set_title(title.as_deref());
+    let _ = tray.set_tooltip(Some(tooltip));
+}
+
+fn tray_status_title(state: &str, elapsed_ms: u64, target_duration_ms: u64) -> Option<String> {
+    match state {
+        "countdown" => Some(" wait".into()),
+        "running" => {
+            let percent = if target_duration_ms == 0 {
+                0
+            } else {
+                (elapsed_ms.saturating_mul(100) / target_duration_ms).min(100)
+            };
+            Some(format!(" {percent}%"))
+        }
+        "paused" => Some(" hold".into()),
+        "completed" => Some(" done".into()),
+        "error" => Some(" err".into()),
+        _ => None,
     }
 }
 
@@ -435,4 +479,16 @@ fn phase_efforts(actions: &[Action]) -> HashMap<Phase, u64> {
         *result.entry(action.phase().clone()).or_default() += action.effort();
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::tray_status_title;
+
+    #[test]
+    fn tray_title_reports_subtle_progress() {
+        assert_eq!(tray_status_title("running", 15_000, 60_000), Some(" 25%".into()));
+        assert_eq!(tray_status_title("paused", 0, 0), Some(" hold".into()));
+        assert_eq!(tray_status_title("idle", 0, 0), None);
+    }
 }
