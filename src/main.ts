@@ -4,7 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { register } from "@tauri-apps/plugin-global-shortcut";
 import gsap from "gsap";
 import "./styles.css";
-import { PERFORMANCE_PROMPT } from "./core/prompt";
+import { PERFORMANCE_PROMPT, revisionInstruction } from "./core/prompt";
 import type {
   PerformanceScript,
   PromptPreferences,
@@ -280,7 +280,8 @@ elements.closePanel.addEventListener("click", async () => {
 
 elements.copyPrompt.addEventListener("click", async () => {
   const request = elements.assignment.value.trim();
-  const complete = `${PERFORMANCE_PROMPT}\n\nREVISION DENSITY:\n${revisionInstruction(elements.revisionDensity.value)}\n\nUSER WRITING REQUEST:\n${request || "[Paste your writing request here before sending.]"}`;
+  const density = elements.revisionDensity.value as PromptPreferences["revisionDensity"];
+  const complete = `${PERFORMANCE_PROMPT}\n\nREVISION DENSITY:\n${revisionInstruction(density)}\n\nUSER WRITING REQUEST:\n${request || "[Paste your writing request here before sending.]"}`;
   await navigator.clipboard.writeText(complete);
   elements.copyPrompt.textContent = "copied";
   gsap.fromTo(elements.copyPrompt, { scale: 0.94 }, { scale: 1, duration: 0.32, ease: "back.out(2)" });
@@ -507,12 +508,6 @@ function restoreForm(): void {
   } catch {
     localStorage.removeItem("typingbot.form");
   }
-}
-
-function revisionInstruction(value: string): string {
-  if (value === "light") return "Use 10-20 meaningful actions per 500 final words. Include at least one deletion and two replacements.";
-  if (value === "balanced") return "Use 20-38 meaningful actions per 500 final words. Include sentence rewrites, one abandoned paragraph, and at least one move.";
-  return "Use 35-60 meaningful actions per 500 final words, within the 250-action limit. Build paragraphs in pieces, abandon multiple candidate lines, rewrite several sentences, delete at least one whole paragraph, and move or combine material at least twice. Every change must advance the visible draft rather than repeat cosmetic edits.";
 }
 
 function stateLabel(state: SessionStatus["state"]): string {
