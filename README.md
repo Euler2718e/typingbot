@@ -44,7 +44,16 @@ curl -fsSL https://bun.sh/install | bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-Close and reopen the terminal once so both tools are available, then paste:
+Close and reopen the terminal once so both tools are available. On Linux, install the native prerequisites before building:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libdbus-1-dev pkg-config libx11-dev libxtst-dev libxkbcommon-dev libxdo-dev
+```
+
+Linux desktop input requires an X11 session. Wayland intentionally restricts synthetic input and global shortcuts, so full playback is not promised there.
+
+Then paste:
 
 ```bash
 git clone https://github.com/Euler2718e/typingbot.git
@@ -54,17 +63,6 @@ bun start
 ```
 
 The first `bun start` compiles the native playback engine and may take a few minutes. Later launches open the terminal interface immediately.
-
-### Linux prerequisites
-
-Linux desktop input requires an X11 session and these development libraries:
-
-```bash
-sudo apt-get update
-sudo apt-get install -y libdbus-1-dev pkg-config libx11-dev libxtst-dev libxkbcommon-dev libxdo-dev
-```
-
-Wayland intentionally restricts synthetic input and global shortcuts, so full playback is not promised there.
 
 ### macOS Accessibility permission
 
