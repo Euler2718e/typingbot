@@ -249,17 +249,24 @@ impl SessionController {
                 Some(target.app_name.clone()),
             );
 
-            self.apply_action(&mut input, action, &settings, &mut document, &mut cursor, || {
-                self.wait_until_ready(
-                    emitter,
-                    &target,
-                    action.phase(),
-                    index,
-                    action_count,
-                    started,
-                    target_ms,
-                )
-            })?;
+            self.apply_action(
+                &mut input,
+                action,
+                &settings,
+                &mut document,
+                &mut cursor,
+                || {
+                    self.wait_until_ready(
+                        emitter,
+                        &target,
+                        action.phase(),
+                        index,
+                        action_count,
+                        started,
+                        target_ms,
+                    )
+                },
+            )?;
 
             let cumulative = used_effort.entry(action.phase().clone()).or_default();
             *cumulative += action.effort();

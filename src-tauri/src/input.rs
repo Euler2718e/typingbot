@@ -238,7 +238,10 @@ impl Composer {
             {
                 index += self.plan_mistake(&mut beats, &graphemes, index, &cadence, rng);
             } else {
-                beats.push(Beat::Type(grapheme.to_string(), cadence.interval(grapheme, rng)));
+                beats.push(Beat::Type(
+                    grapheme.to_string(),
+                    cadence.interval(grapheme, rng),
+                ));
                 index += 1;
             }
         }
@@ -274,11 +277,17 @@ impl Composer {
             beats.push(Beat::Backspace(back_beat(rng)));
             beats.push(Beat::Backspace(back_beat(rng)));
             beats.push(Beat::Type(first.to_string(), cadence.interval(first, rng)));
-            beats.push(Beat::Type(second.to_string(), cadence.interval(second, rng)));
+            beats.push(Beat::Type(
+                second.to_string(),
+                cadence.interval(second, rng),
+            ));
             2
         } else if mode < 55 {
             // Doubling: the letter is struck twice and the extra is removed.
-            beats.push(Beat::Type(current.to_string(), cadence.interval(current, rng)));
+            beats.push(Beat::Type(
+                current.to_string(),
+                cadence.interval(current, rng),
+            ));
             beats.push(Beat::Type(current.to_string(), cadence.tap(rng)));
             beats.push(self.correction_pause(rng));
             beats.push(Beat::Backspace(back_beat(rng)));
@@ -305,9 +314,15 @@ impl Composer {
             for _ in 0..(1 + trailing.len()) {
                 beats.push(Beat::Backspace(back_beat(rng)));
             }
-            beats.push(Beat::Type(current.to_string(), cadence.interval(current, rng)));
+            beats.push(Beat::Type(
+                current.to_string(),
+                cadence.interval(current, rng),
+            ));
             for letter in &trailing {
-                beats.push(Beat::Type(letter.to_string(), cadence.interval(letter, rng)));
+                beats.push(Beat::Type(
+                    letter.to_string(),
+                    cadence.interval(letter, rng),
+                ));
             }
             1 + trailing.len()
         }
@@ -343,7 +358,9 @@ impl Cadence {
             "." | "!" | "?" => rng.random_range(180.0..480.0),
             "," | ";" | ":" => rng.random_range(70.0..210.0),
             "\n" => rng.random_range(240.0..720.0),
-            " " if rng.random_bool(0.015 + self.hesitation * 0.07) => rng.random_range(220.0..760.0),
+            " " if rng.random_bool(0.015 + self.hesitation * 0.07) => {
+                rng.random_range(220.0..760.0)
+            }
             _ => 0.0,
         };
         (self.base_ms * self.pace * jitter + boundary * boundary_scale) as u64
@@ -436,17 +453,19 @@ mod tests {
     use super::*;
 
     fn composer(typos_per_thousand: u8) -> Composer {
-        Composer::from_settings(&serde_json::from_value(serde_json::json!({
-            "durationMinutes": 60,
-            "wpm": 85,
-            "countdownSeconds": 7,
-            "planningPercent": 15,
-            "draftingPercent": 60,
-            "polishingPercent": 25,
-            "correctedTypos": true,
-            "typosPerThousand": typos_per_thousand
-        }))
-        .expect("settings parse"))
+        Composer::from_settings(
+            &serde_json::from_value(serde_json::json!({
+                "durationMinutes": 60,
+                "wpm": 85,
+                "countdownSeconds": 7,
+                "planningPercent": 15,
+                "draftingPercent": 60,
+                "polishingPercent": 25,
+                "correctedTypos": true,
+                "typosPerThousand": typos_per_thousand
+            }))
+            .expect("settings parse"),
+        )
     }
 
     /// Replay the planned beats the way the target field would: typed graphemes

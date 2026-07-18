@@ -18,18 +18,13 @@ pub enum Phase {
     Polishing,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum RhythmProfile {
     Steady,
+    #[default]
     Natural,
     Reflective,
-}
-
-impl Default for RhythmProfile {
-    fn default() -> Self {
-        Self::Natural
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
