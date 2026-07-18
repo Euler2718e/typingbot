@@ -22,6 +22,11 @@ unicode-segmentation = "1.12"
 [dev-dependencies]
 pretty_assertions = "1"
 
+# xcb 1.7.0 pins a vulnerable quick-xml build dependency. Pin the upstream
+# remediation until the next xcb release includes it.
+[patch.crates-io]
+xcb = { git = "https://github.com/rust-x-bindings/rust-xcb", rev = "ae3b2cd080e78173223038ccbebdc644eaf4a9ad" }
+
 [profile.dev]
 debug = 0
 incremental = false
