@@ -1,37 +1,50 @@
-
 # TypingBot
 
-Typingbot is a fully-local bot that writes a text, but with a visible planning, drafting and revising. Give chatgpt an assignement, and watch as a bot plans out a text, drafts it, structures it and corrects typos inside your textbox - effectively simulating the writing-process of humans. 
+TypingBot is a fully local bot that writes text through a visible process of planning, drafting, restructuring, and polishing. Give an LLM a writing assignment, paste its validated performance into TypingBot, and watch the document develop inside your chosen textbox instead of appearing all at once.
+
+It is built for transparent writing demonstrations, accessibility workflows, and screen recordings. It does not claim that automated text was written by a person.
+
+<p align="center">
+  <a href="assets/typingbot-demo.mp4">
+    <img src="assets/typingbot-banner.png" alt="Watch the TypingBot demo" width="800">
+  </a>
+</p>
+
+<p align="center"><strong>▶ Click to watch the 35-second demo</strong> · 1080p · no audio</p>
 
 ## What it does
 
-- Runs entirely inside an OpenTUI terminal workspace. There is no `.app`, WebView, menu-bar process, account, or required network connection. Once you download this on your computer, it will always be accessible, even without internet connection.
-- "Absorbs" your keyboard, letting you type the keys without them affecting the text. Esc pauses (and temporarily let you type again), ctrl+enter resumes and ctrl+x kills the entire thing.
-- Runs a screen where you can monitor the process, choose duration, hesitation-percentage, thinking-depth, and much more.
-- "Works" through different phases. Lowercase, fast-typed planning with little structure: just jotting down thoughts. Creates drafts in a process where the thoughts evolve into paragraphs, and some sentences are discarded. Structures the paragraphs, changes order of some sentences, deletes part of paragraphs and move them around. At last, it runs a final polishing where it "looks" through the text, corrects typos and adds punctuation etc.
-- Varies speed with bursts, hesitation, punctuation pauses, corrected transient typos, and edit pauses.
-- Takes long, visible thinking pauses in planning and drafting, and travels back to each correction with slow arrow-key navigation before returning to where it left off.
-- Runs for the full requested duration, filling any leftover time with a final read-through rather than stopping as soon as the last edit lands.
-- Saves the form locally in `~/.config/typingbot/state.json`.
+- Runs entirely inside a focused OpenTUI terminal workspace. There is no account, cloud database, WebView, or required runtime network connection.
+- Offers 30 distinct writing styles. Each style has its own planning method, drafting pattern, revision behavior, and final voice, and you must choose one before generating or playing a performance.
+- Builds a detailed model prompt from your selected style, writing request, revision depth, duration, phase allocation, rhythm, hesitation, typing speed, correction behavior, and other session settings.
+- Works through visible phases. Planning begins as rough notes and abandoned directions. Drafting grows in blocks, moves ideas around, and replaces weak passages. Polishing corrects the final structure, wording, grammar, and punctuation.
+- Varies typing speed through bursts, hesitation, punctuation pauses, corrected transient typos, and deliberate pauses before edits.
+- Travels back to corrections with visible arrow-key navigation, then returns to the end of the document.
+- Runs for the full requested duration, using any remaining time for a final read-through instead of ending immediately after the last edit.
+- Can absorb ordinary physical keystrokes during playback so they do not alter the destination. Normal Command shortcuts on macOS and Control shortcuts on Windows/Linux remain available, and absorption can be turned off.
+- Saves the terminal form locally in `~/.config/typingbot/state.json`.
 
-## Install
+## How it works
 
-TypingBot is built from source. It needs [Bun](https://bun.sh/) and stable [Rust](https://rustup.rs/); Rust compiles the native playback engine.
+1. Choose a writing style from 1 to 30.
+2. Add the writing request and configure the session.
+3. Press `Ctrl+G` and send the copied prompt to ChatGPT, Claude, Gemini, or another capable model.
+4. Paste the returned JSON into TypingBot, validate it, and start playback.
 
-### 1. Install the prerequisites
+The model never controls your computer. It only returns a constrained JSON performance. TypingBot simulates every action locally and refuses to start unless the actions produce `finalText` exactly.
+
+## Install from source
+
+Building from source is the primary installation path. It is transparent, works across platforms, and avoids the signing warnings attached to unnotarized public binaries.
+
+TypingBot needs [Bun](https://bun.sh/) and stable [Rust](https://rustup.rs/). Install both by pasting these commands into your terminal:
 
 ```bash
 curl -fsSL https://bun.sh/install | bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-Restart your terminal afterwards so both tools are on your `PATH`. On Linux, also install the input libraries:
-
-```bash
-sudo apt-get install -y libx11-dev libxtst-dev libxkbcommon-dev libxdo-dev
-```
-
-### 2. Build and run
+Close and reopen the terminal once so both tools are available, then paste:
 
 ```bash
 git clone https://github.com/Euler2718e/typingbot.git
@@ -40,15 +53,24 @@ bun install
 bun start
 ```
 
-The first `bun start` compiles the native engine, which takes a few minutes. Later launches open the terminal interface immediately.
+The first `bun start` compiles the native playback engine and may take a few minutes. Later launches open the terminal interface immediately.
 
-### 3. Grant Accessibility permission
+### Linux prerequisites
 
-TypingBot cannot type into other applications, or absorb your keystrokes, until the operating system allows it. On macOS the permission belongs to **the terminal application you launched it from** — Terminal, iTerm2, or your editor's integrated terminal — not to a program named TypingBot.
+Linux desktop input requires an X11 session and these development libraries:
 
-Open **System Settings → Privacy & Security → Accessibility**, enable your terminal application, then quit and reopen it. macOS only applies the change to newly started processes.
+```bash
+sudo apt-get update
+sudo apt-get install -y libdbus-1-dev pkg-config libx11-dev libxtst-dev libxkbcommon-dev libxdo-dev
+```
 
-Linux desktop input and global shortcuts require an X11 session; Wayland remains a limited platform.
+Wayland intentionally restricts synthetic input and global shortcuts, so full playback is not promised there.
+
+### macOS Accessibility permission
+
+TypingBot cannot type into other applications or absorb keystrokes until macOS allows your terminal to control the computer.
+
+Open **System Settings → Privacy & Security → Accessibility**, enable the terminal application you use, then quit and reopen it. The permission belongs to Terminal, iTerm2, or your editor's integrated terminal, not to a graphical TypingBot application.
 
 ### Updating
 
@@ -59,24 +81,22 @@ bun run engine:build
 bun start
 ```
 
-`bun start` compiles the engine only when the binary is missing, so after any change to the Rust sources run `bun run engine:build` yourself or you will keep running the previous engine.
+`bun start` compiles the engine only when its binary is missing. After pulling changes to Rust files, run `bun run engine:build` so playback uses the new engine.
 
 ## Use
 
 1. Run `bun start` from the project directory.
-2. Paste the assignment or brief into **Writing request**.
-3. Press `Ctrl+G` to copy the complete model prompt.
-4. Send it to ChatGPT, Claude, Gemini, or another capable model.
-5. Paste only the returned JSON into **Performance JSON**.
-6. Configure duration, WPM, countdown, phase allocation, rhythm, variation, hesitation, typo behavior, correction delay, edit pause, thinking depth, correction travel speed, and keyboard absorption.
+2. Enter a number from 1 to 30 in the required **Writing style** field.
+3. Paste the assignment or brief into **Writing request**.
+4. Configure duration, WPM, countdown, phase allocation, revision depth, rhythm, variation, hesitation, typo behavior, correction delay, edit pause, thinking depth, correction travel speed, and keyboard absorption.
+5. Press `Ctrl+G` to copy the complete style-aware model prompt.
+6. Send that prompt to an LLM and paste only its returned JSON into **Performance JSON**.
 7. Press `Ctrl+V` to validate without starting, or `Ctrl+Enter` to validate and play.
-8. During the countdown, switch to the destination textbox.
+8. During the countdown, focus the destination textbox.
 
-The **total time** field sets how long the whole performance lasts (default 60 minutes); the session paces every phase to fill it and stays busy for the full duration.
+The native engine continues running when the terminal is behind another application. If focus leaves the captured destination application, playback pauses until you return and explicitly resume it.
 
-The terminal may remain behind the destination application. The native engine continues running and reports status back to the terminal. Returning to TypingBot does not alter the document, but leaving the locked destination during playback pauses the session until it is explicitly resumed.
-
-### Controls
+### Terminal controls
 
 | Key | Action |
 |---|---|
@@ -86,42 +106,49 @@ The terminal may remain behind the destination application. The native engine co
 | `Ctrl+V` | Validate the performance |
 | `Ctrl+Enter` | Validate and start playback |
 | `Ctrl+Space` | Pause or resume from the terminal |
-| `Cmd/Ctrl+Alt+Space` | Pause or resume globally |
-| `Ctrl+X` | Stop playback (works globally during playback) |
+| `Ctrl+X` | Stop playback |
 | `Ctrl+C` | Stop the engine and quit cleanly |
 
-While a performance is playing, these controls work from any application:
+### Global playback controls
+
+These controls work from the destination application:
 
 | Key | Action |
 |---|---|
-| `Esc` | Pause playback |
+| `Esc` | Pause playback and return the ordinary keyboard |
 | `Ctrl+Enter` | Resume a paused performance |
 | `Ctrl+X` | Stop the performance |
-| `Cmd/Ctrl+Alt+Space` | Toggle pause and resume |
+| `Cmd+Alt+Space` on macOS | Toggle pause and resume |
+| `Ctrl+Alt+Space` on Windows/Linux | Toggle pause and resume |
 
-When keyboard absorption is on, every other key you press is swallowed so it cannot reach the destination document. Turn absorption off in **timing + feel → keyboard** to leave your keyboard live during playback.
+When keyboard absorption is enabled, ordinary typing is discarded locally. Command shortcuts such as `Cmd+C`, `Cmd+V`, and `Cmd+Z` on macOS, or their Control equivalents on Windows/Linux, still pass through. Set **keyboard → off** if you want every ordinary key to remain live during playback.
 
 ## Performance language
 
-The model returns a constrained JSON document rather than raw keyboard instructions. Anchors must be unique at their exact step, actions cannot execute code, and the final simulated document must exactly equal `finalText`.
+The model returns semantic editing actions rather than raw keyboard instructions. Anchors must be unique at the exact step where they are used, actions cannot execute code, and the final simulated document must exactly equal `finalText`.
 
 Read the [performance-format reference](docs/performance-format.md) or open the [complete example](examples/demo.performance.json).
 
 ## Development
 
 ```bash
-bun test               # unit tests
-bun run check          # typecheck and cargo check
-bun run engine:build   # rebuild the native engine
+bun test
+bun run check
+bun run build
+cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 
 ## Privacy and safety
 
-- Prompt construction and performance validation are local.
+- Prompt construction, state storage, performance validation, and playback are local.
 - TypingBot makes no model or HTTP request.
 - Performance scripts cannot access the filesystem, shell, clipboard, or network.
-- Physical keystrokes are never recorded or transmitted. When absorption is enabled they are discarded locally so they cannot reach the destination; the engine never inspects or stores them.
+- Physical keystrokes are never recorded or transmitted. Absorbed keys are discarded locally.
 - Focus loss pauses external input before the next action.
+- The performance is transparent automation, not evidence of human authorship.
+
+Platform signing limitations for optional release binaries are documented in [BLOCKERS.md](BLOCKERS.md).
 
 ## License
 
