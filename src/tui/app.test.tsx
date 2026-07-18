@@ -15,12 +15,14 @@ describe("terminal interface", () => {
           connectEngine={false}
           persistState={false}
         />,
-        { width: 120, height: 35 },
+        { width: 120, height: 35, kittyKeyboard: true },
       );
     });
     await act(async () => { await setup.renderOnce(); });
     let frame = setup.captureCharFrame();
     expect(frame).toContain("typingbot / terminal writing playback");
+    expect(frame).toContain("writing style (required)");
+    expect(frame).toContain("choose a number before prompt + play");
     expect(frame).toContain("writing request");
     expect(frame).toContain("performance json");
     expect(frame).toContain("process allocation");
@@ -66,4 +68,23 @@ describe("terminal interface", () => {
     expect(frame).toContain("performance json");
     await act(async () => { setup.renderer.destroy(); });
   });
+
+  test("shows the selected process identity in the monitor", async () => {
+    const initialState = structuredClone(defaultFormState);
+    initialState.promptPreferences.writingStyle = 18;
+    let setup!: Awaited<ReturnType<typeof testRender>>;
+    await act(async () => {
+      setup = await testRender(
+        <TypingBotApp initialState={initialState} connectEngine={false} persistState={false} />,
+        { width: 120, height: 35 },
+      );
+    });
+    await act(async () => { await setup.renderOnce(); });
+    const frame = setup.captureCharFrame();
+    expect(frame).toContain("style 18");
+    expect(frame).toContain("the systems thinker");
+    expect(frame).toContain("trace feedback loops, incentives, and second-order effects");
+    await act(async () => { setup.renderer.destroy(); });
+  });
+
 });
