@@ -1,7 +1,7 @@
 import type { InputRenderable, ScrollBoxRenderable, SelectOption, TextareaRenderable } from "@opentui/core";
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PERFORMANCE_PROMPT, revisionInstruction } from "../core/prompt";
+import { buildPerformancePrompt } from "../core/prompt";
 import type {
   PerformanceScript,
   RevisionDensity,
@@ -145,15 +145,14 @@ export function TypingBotApp({
 
   const copyPrompt = useCallback(async () => {
     const request = form.assignment.trim() || "[Paste your writing request here before sending.]";
-    const density = form.promptPreferences.revisionDensity;
-    const prompt = `${PERFORMANCE_PROMPT}\n\nREVISION DENSITY:\n${revisionInstruction(density)}\n\nUSER WRITING REQUEST:\n${request}`;
     try {
+      const prompt = buildPerformancePrompt(request, form.promptPreferences, form.settings);
       await copyToClipboard(prompt);
       setNotice("complete model prompt copied to the system clipboard");
     } catch (error) {
       setNotice(errorMessage(error));
     }
-  }, [form.assignment, form.promptPreferences.revisionDensity]);
+  }, [form.assignment, form.promptPreferences, form.settings]);
 
   const validate = useCallback(async (play: boolean) => {
     setBusy(true);
@@ -327,7 +326,7 @@ export function TypingBotApp({
             selectedTextColor={color.accent}
             onChange={(_, option) => option && setForm((current) => ({
               ...current,
-              promptPreferences: { revisionDensity: option.value as RevisionDensity },
+              promptPreferences: { ...current.promptPreferences, revisionDensity: option.value as RevisionDensity },
             }))}
           />
           <box height={1} marginTop={1} flexDirection="row" justifyContent="space-between">

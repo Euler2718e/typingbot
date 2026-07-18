@@ -46,6 +46,7 @@ export interface SessionSettings {
 
 export interface PromptPreferences {
   revisionDensity: RevisionDensity;
+  writingStyle: number | null;
 }
 
 export interface ValidationResult {

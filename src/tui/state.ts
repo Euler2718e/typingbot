@@ -33,7 +33,7 @@ export const defaultFormState: TuiFormState = {
   assignment: "",
   performance: "",
   settings: defaultSettings,
-  promptPreferences: { revisionDensity: "deep" },
+  promptPreferences: { revisionDensity: "deep", writingStyle: null },
 };
 
 export function defaultStatePath(): string {
@@ -61,6 +61,7 @@ export function normalizeFormState(state: Partial<TuiFormState>): TuiFormState {
   const settings = { ...defaultSettings, ...(state.settings ?? {}) };
   const rhythmProfile = settings.rhythmProfile;
   const revisionDensity = state.promptPreferences?.revisionDensity;
+  const writingStyle = state.promptPreferences?.writingStyle;
   return {
     assignment: typeof state.assignment === "string" ? state.assignment : "",
     performance: typeof state.performance === "string" ? state.performance : "",
@@ -84,6 +85,9 @@ export function normalizeFormState(state: Partial<TuiFormState>): TuiFormState {
     },
     promptPreferences: {
       revisionDensity: revisionDensity === "light" || revisionDensity === "balanced" ? revisionDensity : "deep",
+      writingStyle: typeof writingStyle === "number" && Number.isInteger(writingStyle) && writingStyle >= 1 && writingStyle <= 30
+        ? writingStyle
+        : null,
     },
   };
 }

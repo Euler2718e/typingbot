@@ -13,10 +13,12 @@ describe("terminal state", () => {
         wpm: 2,
         variationPercent: 500,
       },
+      promptPreferences: { revisionDensity: "deep", writingStyle: 99 },
     });
     expect(state.settings.durationMinutes).toBe(480);
     expect(state.settings.wpm).toBe(20);
     expect(state.settings.variationPercent).toBe(100);
+    expect(state.promptPreferences.writingStyle).toBeNull();
   });
 
   test("saves atomically and restores the form", async () => {
