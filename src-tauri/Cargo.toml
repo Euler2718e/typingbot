@@ -1,29 +1,31 @@
 [package]
 name = "typingbot"
 version = "2.0.0"
-description = "Local writing-process playback for desktop text fields"
+description = "Native playback engine for the TypingBot terminal interface"
 authors = ["Euler2718e"]
 license = "MIT"
 edition = "2021"
 
 [lib]
 name = "typingbot_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
-
-[build-dependencies]
-tauri-build = { version = "2", features = [] }
+crate-type = ["rlib"]
 
 [dependencies]
 active-win-pos-rs = "0.11"
 enigo = "0.6"
-global-hotkey = "0.8"
 rand = "0.9"
+rdev = { version = "0.5", features = ["unstable_grab"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tauri = { version = "2", features = ["tray-icon"] }
-tauri-plugin-global-shortcut = "2"
-tao = "0.35"
 unicode-segmentation = "1.12"
 
 [dev-dependencies]
 pretty_assertions = "1"
+
+[profile.dev]
+debug = 0
+incremental = false
+
+[profile.test]
+debug = 0
+incremental = false

@@ -41,7 +41,11 @@ impl EngineCommand {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
 pub enum EngineEvent {
     Ready {
         protocol: u8,

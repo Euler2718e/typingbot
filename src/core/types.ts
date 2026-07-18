@@ -39,6 +39,9 @@ export interface SessionSettings {
   typosPerThousand: number;
   correctionDelayMs: number;
   editPauseMs: number;
+  absorbKeystrokes: boolean;
+  thinkingIntensity: number;
+  correctionNavMs: number;
 }
 
 export interface PromptPreferences {

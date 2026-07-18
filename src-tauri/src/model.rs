@@ -130,6 +130,12 @@ pub struct SessionSettings {
     pub correction_delay_ms: u64,
     #[serde(default = "default_edit_pause_ms")]
     pub edit_pause_ms: u64,
+    #[serde(default = "default_absorb_keystrokes")]
+    pub absorb_keystrokes: bool,
+    #[serde(default = "default_thinking_intensity")]
+    pub thinking_intensity: u8,
+    #[serde(default = "default_correction_nav_ms")]
+    pub correction_nav_ms: u64,
 }
 
 fn default_variation_percent() -> u8 {
@@ -150,6 +156,18 @@ fn default_correction_delay_ms() -> u64 {
 
 fn default_edit_pause_ms() -> u64 {
     520
+}
+
+fn default_absorb_keystrokes() -> bool {
+    true
+}
+
+fn default_thinking_intensity() -> u8 {
+    60
+}
+
+fn default_correction_nav_ms() -> u64 {
+    26
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -184,6 +202,12 @@ pub fn validate_settings(settings: &SessionSettings) -> Result<(), String> {
     }
     if !(40..=1200).contains(&settings.correction_delay_ms) || settings.edit_pause_ms > 3000 {
         return Err("correction and edit pause timing is outside the supported range".into());
+    }
+    if settings.thinking_intensity > 100 {
+        return Err("thinking intensity must be between 0 and 100".into());
+    }
+    if !(4..=200).contains(&settings.correction_nav_ms) {
+        return Err("correction navigation speed must be between 4 and 200 ms per key".into());
     }
     Ok(())
 }
@@ -352,5 +376,41 @@ mod tests {
         assert_eq!(settings.variation_percent, 62);
         assert_eq!(settings.typos_per_thousand, 12);
         assert_eq!(settings.edit_pause_ms, 520);
+        assert!(settings.absorb_keystrokes);
+        assert_eq!(settings.thinking_intensity, 60);
+        assert_eq!(settings.correction_nav_ms, 26);
+    }
+
+    fn valid_settings() -> SessionSettings {
+        serde_json::from_value(serde_json::json!({
+            "durationMinutes": 60,
+            "wpm": 85,
+            "countdownSeconds": 7,
+            "planningPercent": 15,
+            "draftingPercent": 60,
+            "polishingPercent": 25,
+            "correctedTypos": true
+        }))
+        .expect("baseline settings should parse")
+    }
+
+    #[test]
+    fn accepts_default_cadence_settings() {
+        assert_eq!(validate_settings(&valid_settings()), Ok(()));
+    }
+
+    #[test]
+    fn rejects_out_of_range_thinking_and_navigation() {
+        let mut settings = valid_settings();
+        settings.thinking_intensity = 150;
+        assert!(validate_settings(&settings).is_err());
+
+        let mut settings = valid_settings();
+        settings.correction_nav_ms = 1;
+        assert!(validate_settings(&settings).is_err());
+
+        let mut settings = valid_settings();
+        settings.correction_nav_ms = 500;
+        assert!(validate_settings(&settings).is_err());
     }
 }

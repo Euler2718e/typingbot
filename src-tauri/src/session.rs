@@ -6,12 +6,27 @@ use crate::{
     },
 };
 use active_win_pos_rs::{get_active_window, ActiveWindow};
+use rand::Rng;
 use std::{
     collections::HashMap,
-    sync::{Arc, Condvar, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Condvar, Mutex,
+    },
     thread,
     time::{Duration, Instant},
 };
+
+/// Sentinel error used to distinguish a deliberate stop from a genuine failure
+/// so the engine can report "stopped" instead of "error".
+const STOP_SIGNAL: &str = "__typingbot_stopped__";
+
+/// How long the inject guard stays raised after the last synthetic event in an
+/// emission span, letting the OS deliver those events to the keyboard grab
+/// before absorption resumes. CGEvent delivery to a tap is asynchronous, so this
+/// margin — not a per-keystroke toggle — is what keeps the engine from ever
+/// swallowing its own keystrokes.
+const GUARD_DRAIN_MS: u64 = 60;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ControlState {
@@ -26,17 +41,50 @@ pub type StatusEmitter = Arc<dyn Fn(SessionStatus) + Send + Sync + 'static>;
 #[derive(Clone)]
 pub struct SessionController {
     shared: Arc<(Mutex<ControlState>, Condvar)>,
+    /// Raised by the input driver around every synthetic keystroke so the global
+    /// keyboard grab can pass the engine's own events through while absorbing the
+    /// operator's real keystrokes.
+    inject_guard: Arc<AtomicBool>,
+    /// Whether the current session absorbs real keystrokes. Mirrors the active
+    /// session's `absorbKeystrokes` setting for the keyboard grab to read.
+    absorb_enabled: Arc<AtomicBool>,
 }
 
 impl Default for SessionController {
     fn default() -> Self {
         Self {
             shared: Arc::new((Mutex::new(ControlState::Idle), Condvar::new())),
+            inject_guard: Arc::new(AtomicBool::new(false)),
+            absorb_enabled: Arc::new(AtomicBool::new(true)),
         }
     }
 }
 
 impl SessionController {
+    /// Shared flag the input driver raises while emitting its own keystrokes.
+    pub fn inject_guard(&self) -> Arc<AtomicBool> {
+        self.inject_guard.clone()
+    }
+
+    /// Shared flag reflecting whether the active session absorbs real keystrokes.
+    pub fn absorb_enabled(&self) -> Arc<AtomicBool> {
+        self.absorb_enabled.clone()
+    }
+
+    /// Raise the inject guard for the duration of an emission span so the
+    /// keyboard grab lets the engine's own keystrokes and arrow presses through.
+    fn absorb_arm(&self) {
+        self.inject_guard.store(true, Ordering::SeqCst);
+    }
+
+    /// Lower the inject guard after letting in-flight synthetic events drain, so
+    /// absorption of the operator's keystrokes resumes only once the engine has
+    /// gone quiet.
+    fn absorb_release(&self) {
+        thread::sleep(Duration::from_millis(GUARD_DRAIN_MS));
+        self.inject_guard.store(false, Ordering::SeqCst);
+    }
+
     pub fn start(
         &self,
         emitter: StatusEmitter,
@@ -51,11 +99,31 @@ impl SessionController {
             }
             *state = ControlState::Running;
         }
+        self.absorb_enabled
+            .store(settings.absorb_keystrokes, Ordering::SeqCst);
+        self.inject_guard.store(false, Ordering::SeqCst);
         let controller = self.clone();
         thread::spawn(move || {
-            if let Err(error) = controller.run(&emitter, script, settings) {
-                controller.emit(&emitter, "error", None, 0, 0, 0, 0, error, None);
+            match controller.run(&emitter, script, settings) {
+                Ok(()) => {}
+                Err(error) if error == STOP_SIGNAL => {
+                    controller.emit(
+                        &emitter,
+                        "stopped",
+                        None,
+                        0,
+                        0,
+                        0,
+                        0,
+                        "Session stopped".into(),
+                        None,
+                    );
+                }
+                Err(error) => {
+                    controller.emit(&emitter, "error", None, 0, 0, 0, 0, error, None);
+                }
             }
+            controller.inject_guard.store(false, Ordering::SeqCst);
             let (lock, _) = &*controller.shared;
             if let Ok(mut state) = lock.lock() {
                 *state = ControlState::Idle;
@@ -181,7 +249,7 @@ impl SessionController {
                 Some(target.app_name.clone()),
             );
 
-            self.apply_action(&mut input, action, &mut document, &mut cursor, || {
+            self.apply_action(&mut input, action, &settings, &mut document, &mut cursor, || {
                 self.wait_until_ready(
                     emitter,
                     &target,
@@ -214,6 +282,35 @@ impl SessionController {
         if document != script.final_text {
             return Err("Internal document mirror diverged before completion".into());
         }
+
+        // Occupy the remaining requested time with a final read-through so the
+        // session lasts the full duration instead of ending as soon as the last
+        // edit lands.
+        let elapsed = started.elapsed().as_millis() as u64;
+        if target_ms > elapsed {
+            self.emit(
+                emitter,
+                "running",
+                Some(Phase::Polishing),
+                action_count.saturating_sub(1),
+                action_count,
+                elapsed,
+                target_ms,
+                "Reading the finished piece one more time".into(),
+                Some(target.app_name.clone()),
+            );
+            self.interruptible_sleep(
+                target_ms - elapsed,
+                emitter,
+                &target,
+                &Phase::Polishing,
+                action_count.saturating_sub(1),
+                action_count,
+                started,
+                target_ms,
+            )?;
+        }
+
         self.emit(
             emitter,
             "completed",
@@ -232,6 +329,7 @@ impl SessionController {
         &self,
         input: &mut InputDriver,
         action: &Action,
+        settings: &SessionSettings,
         document: &mut String,
         cursor: &mut usize,
         mut gate: F,
@@ -241,29 +339,43 @@ impl SessionController {
     {
         match action {
             Action::Append { text, .. } => {
-                move_to(input, cursor, grapheme_count(document))?;
-                input.type_human(text, &mut gate)?;
+                let jotting = matches!(action.phase(), Phase::Planning);
+                self.absorb_arm();
+                move_to(input, cursor, grapheme_count(document), &mut gate)?;
+                input.type_human(text, jotting, &mut gate)?;
+                self.absorb_release();
                 *cursor += grapheme_count(text);
                 document.push_str(text);
             }
             Action::Clear { .. } => {
                 input.pause_before_edit(&mut gate)?;
+                self.absorb_arm();
                 input.select_all()?;
                 input.backspace()?;
+                self.absorb_release();
                 document.clear();
                 *cursor = 0;
             }
-            Action::Pause { .. } => {}
+            Action::Pause { .. } => {
+                self.think_pause(action.phase(), action.effort(), settings, &mut gate)?;
+            }
             Action::Replace { find, text, .. } => {
                 input.pause_before_edit(&mut gate)?;
+                self.absorb_arm();
                 replace_visible(input, document, cursor, find, text, &mut gate)?;
+                return_to_end(input, document, cursor, &mut gate)?;
+                self.absorb_release();
             }
             Action::Delete { find, .. } => {
                 input.pause_before_edit(&mut gate)?;
+                self.absorb_arm();
                 replace_visible(input, document, cursor, find, "", &mut gate)?;
+                return_to_end(input, document, cursor, &mut gate)?;
+                self.absorb_release();
             }
             Action::Move { find, after, .. } => {
                 input.pause_before_edit(&mut gate)?;
+                self.absorb_arm();
                 let moved = find.clone();
                 replace_visible(input, document, cursor, find, "", &mut gate)?;
                 let byte_index = match after {
@@ -271,13 +383,39 @@ impl SessionController {
                     Some(anchor) => unique_index(document, anchor, 0)? + anchor.len(),
                 };
                 let target = grapheme_index(document, byte_index);
-                move_to(input, cursor, target)?;
-                input.type_human(&moved, &mut gate)?;
+                move_to(input, cursor, target, &mut gate)?;
+                input.type_human(&moved, false, &mut gate)?;
                 document.insert_str(byte_index, &moved);
                 *cursor += grapheme_count(&moved);
+                return_to_end(input, document, cursor, &mut gate)?;
+                self.absorb_release();
             }
         }
         Ok(())
+    }
+
+    /// A visible thinking pause. Planning and drafting linger the longest because
+    /// that is where a writer stares at the page; polishing pauses are shorter.
+    fn think_pause<F>(
+        &self,
+        phase: &Phase,
+        effort: u64,
+        settings: &SessionSettings,
+        gate: &mut F,
+    ) -> Result<(), String>
+    where
+        F: FnMut() -> Result<(), String>,
+    {
+        let intensity = f64::from(settings.thinking_intensity.min(100)) / 100.0;
+        let base = match phase {
+            Phase::Planning | Phase::Drafting => 3500.0 + 9000.0 * intensity,
+            Phase::Polishing => 1200.0 + 3000.0 * intensity,
+        };
+        let effort_scale = 0.6 + 0.2 * effort as f64;
+        let mut rng = rand::rng();
+        let jitter = rng.random_range(0.75..1.3);
+        let dwell = (base * effort_scale * jitter) as u64;
+        gated_sleep(dwell, gate)
     }
 
     fn ensure_running(&self) -> Result<(), String> {
@@ -289,9 +427,22 @@ impl SessionController {
                 ControlState::Paused => {
                     state = signal.wait(state).map_err(|_| "session lock is poisoned")?
                 }
-                ControlState::Stopped => return Err("Session stopped".into()),
+                ControlState::Stopped => return Err(STOP_SIGNAL.into()),
                 ControlState::Idle => return Err("Session is not active".into()),
             }
+        }
+    }
+
+    /// True only when a reliable window read shows a different application. A
+    /// failed read is treated as "still focused" so a transient query error can
+    /// never abort the performance.
+    fn focus_lost(&self, target: &ActiveWindow) -> bool {
+        match get_active_window() {
+            Ok(window) => {
+                window.process_id != target.process_id
+                    && !window.app_name.to_lowercase().contains("typingbot")
+            }
+            Err(_) => false,
         }
     }
 
@@ -307,38 +458,44 @@ impl SessionController {
         target_ms: u64,
     ) -> Result<(), String> {
         self.ensure_running()?;
-        let focused = get_active_window().map_err(|_| "Could not read the focused application")?;
-        if focused.process_id != target.process_id {
-            {
-                let (lock, _) = &*self.shared;
-                let mut state = lock.lock().map_err(|_| "session lock is poisoned")?;
+        if !self.focus_lost(target) {
+            return Ok(());
+        }
+        // Confirm the change with a brief recheck to ignore momentary blips
+        // (focus rings, input methods) that would otherwise pause needlessly.
+        thread::sleep(Duration::from_millis(160));
+        if !self.focus_lost(target) {
+            return Ok(());
+        }
+        {
+            let (lock, _) = &*self.shared;
+            let mut state = lock.lock().map_err(|_| "session lock is poisoned")?;
+            if *state == ControlState::Running {
                 *state = ControlState::Paused;
             }
-            self.emit(
+        }
+        self.emit(
+            emitter,
+            "paused",
+            Some(phase.clone()),
+            action_index,
+            action_count,
+            started.elapsed().as_millis() as u64,
+            target_ms,
+            format!("Paused because focus left {}", target.app_name),
+            Some(target.app_name.clone()),
+        );
+        self.ensure_running()?;
+        if self.focus_lost(target) {
+            return self.wait_until_ready(
                 emitter,
-                "paused",
-                Some(phase.clone()),
+                target,
+                phase,
                 action_index,
                 action_count,
-                started.elapsed().as_millis() as u64,
+                started,
                 target_ms,
-                format!("Paused because focus left {}", target.app_name),
-                Some(target.app_name.clone()),
             );
-            self.ensure_running()?;
-            let refocused =
-                get_active_window().map_err(|_| "Could not read the focused application")?;
-            if refocused.process_id != target.process_id {
-                return self.wait_until_ready(
-                    emitter,
-                    target,
-                    phase,
-                    action_index,
-                    action_count,
-                    started,
-                    target_ms,
-                );
-            }
         }
         Ok(())
     }
@@ -398,11 +555,33 @@ impl SessionController {
     }
 }
 
-fn move_to(input: &mut InputDriver, cursor: &mut usize, target: usize) -> Result<(), String> {
+fn move_to<F>(
+    input: &mut InputDriver,
+    cursor: &mut usize,
+    target: usize,
+    gate: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut() -> Result<(), String>,
+{
     let delta = target as isize - *cursor as isize;
-    input.move_cursor(delta)?;
+    input.move_cursor(delta, gate)?;
     *cursor = target;
     Ok(())
+}
+
+/// After a visible correction, travel back to the end of the document so the
+/// writer visibly returns to where composition left off.
+fn return_to_end<F>(
+    input: &mut InputDriver,
+    document: &str,
+    cursor: &mut usize,
+    gate: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut() -> Result<(), String>,
+{
+    move_to(input, cursor, grapheme_count(document), gate)
 }
 
 fn replace_visible<F>(
@@ -419,15 +598,29 @@ where
     let byte_index = unique_index(document, find, 0)?;
     let start = grapheme_index(document, byte_index);
     let selection = grapheme_count(find);
-    move_to(input, cursor, start)?;
-    input.select_right(selection)?;
+    move_to(input, cursor, start, &mut *gate)?;
+    input.select_right(selection, &mut *gate)?;
     if replacement.is_empty() {
         input.backspace()?;
     } else {
-        input.type_human(replacement, gate)?;
+        input.type_human(replacement, false, &mut *gate)?;
     }
     document.replace_range(byte_index..byte_index + find.len(), replacement);
     *cursor = start + grapheme_count(replacement);
+    Ok(())
+}
+
+fn gated_sleep<F>(milliseconds: u64, gate: &mut F) -> Result<(), String>
+where
+    F: FnMut() -> Result<(), String>,
+{
+    let mut remaining = milliseconds;
+    while remaining > 0 {
+        gate()?;
+        let slice = remaining.min(100);
+        thread::sleep(Duration::from_millis(slice));
+        remaining -= slice;
+    }
     Ok(())
 }
 

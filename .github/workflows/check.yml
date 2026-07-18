@@ -18,22 +18,30 @@ jobs:
         with:
           bun-version: 1.3.14
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install Linux system dependencies
+      - name: Install Linux input dependencies
         if: matrix.os == 'ubuntu-22.04'
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxtst-dev libxkbcommon-dev libxdo-dev
       - run: bun install --frozen-lockfile
       - run: bun test
-      - run: bun run build
+      - run: bun run check:tui
+      - run: bun run tui:build
       - run: cargo test --manifest-path src-tauri/Cargo.toml
-      - name: Build and verify macOS app bundle
+      - name: Build and verify terminal playback engine
+        run: cargo build --release --manifest-path src-tauri/Cargo.toml --bin typingbot-engine
+      - name: Verify macOS terminal executables
         if: runner.os == 'macOS'
         run: |
-          bun run tauri build --bundles app
-          codesign --verify --deep --strict --verbose=2 src-tauri/target/release/bundle/macos/TypingBot.app
-          hdiutil create -quiet -fs HFS+ \
-            -srcfolder src-tauri/target/release/bundle/macos/TypingBot.app \
-            "$RUNNER_TEMP/TypingBot.dmg"
-          ./scripts/install-macos.sh "$RUNNER_TEMP/TypingBot.dmg" \
-            --destination "$RUNNER_TEMP/Applications/TypingBot.app" \
-            --no-open
-          codesign --verify --deep --strict --verbose=2 "$RUNNER_TEMP/Applications/TypingBot.app"
+          codesign --force --timestamp=none --sign - dist/typingbot
+          codesign --force --timestamp=none --sign - src-tauri/target/release/typingbot-engine
+          codesign --verify --strict --verbose=2 dist/typingbot
+          codesign --verify --strict --verbose=2 src-tauri/target/release/typingbot-engine
+          mkdir -p "$RUNNER_TEMP/package"
+          cp dist/typingbot "$RUNNER_TEMP/package/typingbot"
+          cp src-tauri/target/release/typingbot-engine "$RUNNER_TEMP/package/typingbot-engine"
+          cp scripts/install-terminal.sh "$RUNNER_TEMP/package/install-terminal.sh"
+          TYPINGBOT_INSTALL_DIR="$RUNNER_TEMP/installed/bin" \
+            TYPINGBOT_PROFILE_PATH="$RUNNER_TEMP/installed/.zprofile" \
+            zsh "$RUNNER_TEMP/package/install-terminal.sh" --no-open
+          test -x "$RUNNER_TEMP/installed/bin/typingbot"
+          test -x "$RUNNER_TEMP/installed/bin/typingbot-engine"
+          "$RUNNER_TEMP/installed/bin/typingbot" --help | grep -q "terminal writing playback"

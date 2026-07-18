@@ -4,21 +4,23 @@
   "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "check": "tsc --noEmit && cargo check --manifest-path src-tauri/Cargo.toml",
+    "start": "bun run src/tui/launch.ts",
+    "tui": "bun run src/tui/index.tsx",
+    "engine:build": "cargo build --release --manifest-path src-tauri/Cargo.toml --bin typingbot-engine",
+    "tui:build": "bun build --compile src/tui/index.tsx --outfile dist/typingbot",
+    "check:tui": "tsc --project tsconfig.tui.json --noEmit",
+    "check": "bun run check:tui && cargo check --manifest-path src-tauri/Cargo.toml --bin typingbot-engine",
     "test": "bun test && cargo test --manifest-path src-tauri/Cargo.toml",
-    "tauri": "tauri"
+    "build": "bun run tui:build && bun run engine:build"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.8.0",
-    "@tauri-apps/plugin-global-shortcut": "^2.3.0",
-    "gsap": "^3.15.0"
+    "@opentui/core": "^0.4.4",
+    "@opentui/react": "^0.4.4",
+    "react": "^19.2.7"
   },
   "devDependencies": {
     "@types/bun": "^1.3.5",
-    "@tauri-apps/cli": "^2.8.4",
-    "typescript": "^5.9.2",
-    "vite": "^7.1.3"
+    "@types/react": "^19.2.17",
+    "typescript": "^5.9.2"
   }
 }

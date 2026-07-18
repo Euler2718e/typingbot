@@ -1,86 +1,105 @@
-<div align="center">
-  <img src="assets/typingbot-banner.png" alt="TypingBot" width="760">
-</div>
 
 # TypingBot
 
-TypingBot is a local desktop app that plays a visible planning, drafting, and revision process into any focused text field. You give a language model one strict prompt, paste its JSON response into TypingBot, choose a duration and average speed, then run the performance offline.
-
-It is built for writing demonstrations, accessibility workflows, rehearsals, and screen recordings. It is not proof of human authorship and should not be used to misrepresent work or bypass academic or workplace rules.
+Typingbot is a fully-local bot that writes a text, but with a visible planning, drafting and revising. Give chatgpt an assignement, and watch as a bot plans out a text, drafts it, structures it and corrects typos inside your textbox - effectively simulating the writing-process of humans. 
 
 ## What it does
 
-- Runs on macOS, Windows, and Linux through Tauri.
-- Lives in the macOS menu bar as a 440-pixel utility panel instead of a conventional app window or Dock presence; Windows and Linux use the system tray.
-- Types into ordinary desktop and browser text fields.
-- Shows rough lowercase planning before the main draft.
-- Supports append, exact replacement, deletion, movement, clearing, and timed rereading.
-- Divides the session into planning, drafting, and polishing budgets.
-- Varies speed with short bursts, hesitation, punctuation pauses, and corrected transient typos.
-- Simulates every edit locally and requires an exact match with the supplied final text.
-- Locks onto the destination application and pauses when focus changes.
-- Shows compact live progress beside the menu-bar icon without requiring the panel to stay open.
-- Provides `Cmd/Ctrl + Alt + Space` as a global pause and resume shortcut.
-- Makes no network requests and does not require an account.
+- Runs entirely inside an OpenTUI terminal workspace. There is no `.app`, WebView, menu-bar process, account, or required network connection. Once you download this on your computer, it will always be accessible, even without internet connection.
+- "Absorbs" your keyboard, letting you type the keys without them affecting the text. Esc pauses (and temporarily let you type again), ctrl+enter resumes and ctrl+x kills the entire thing.
+- Runs a screen where you can monitor the process, choose duration, hesitation-percentage, thinking-depth, and much more.
+- "Works" through different phases. Lowercase, fast-typed planning with little structure: just jotting down thoughts. Creates drafts in a process where the thoughts evolve into paragraphs, and some sentences are discarded. Structures the paragraphs, changes order of some sentences, deletes part of paragraphs and move them around. At last, it runs a final polishing where it "looks" through the text, corrects typos and adds punctuation etc.
+- Varies speed with bursts, hesitation, punctuation pauses, corrected transient typos, and edit pauses.
+- Takes long, visible thinking pauses in planning and drafting, and travels back to each correction with slow arrow-key navigation before returning to where it left off.
+- Runs for the full requested duration, filling any leftover time with a final read-through rather than stopping as soon as the last edit lands.
+- Saves the form locally in `~/.config/typingbot/state.json`.
 
 ## Install
 
-### macOS: install from Terminal
+TypingBot is built from source. It needs [Bun](https://bun.sh/) and stable [Rust](https://rustup.rs/); Rust compiles the native playback engine.
 
-The Terminal installer is the primary Mac installation path until TypingBot has an Apple-notarized release. It avoids the blocked double-click flow without disabling Gatekeeper, changing a system security setting, or requiring an administrator password.
-
-1. Open the repository's **Releases** page.
-2. Download `install-macos.sh` and the newest Mac disk image:
-   - Apple Silicon (`M1`, `M2`, `M3`, `M4`, or newer): the `aarch64.dmg`
-   - Intel: the `x64.dmg`
-3. Open **Terminal**.
-4. Type `zsh `, including the trailing space.
-5. Drag `install-macos.sh` from Downloads into Terminal.
-6. Type one space, then drag the downloaded `.dmg` into Terminal.
-7. Press Return.
-
-The installer accepts a `.dmg`, `.zip`, or `.app`. It checks the bundle identifier, executable, and internal code-signature integrity; installs to `~/Applications/TypingBot.app`; removes quarantine from that copy only; registers it with macOS; and opens it as a menu-bar utility. It refuses a damaged signature or an existing destination that is not TypingBot.
-
-Only use the installer and app downloaded from this private repository. An ad-hoc signature verifies that the bundle was not accidentally damaged after signing; unlike Apple notarization, it does not establish a public developer identity.
-
-On first use, macOS will still ask you to grant TypingBot **Accessibility** permission. That permission is required for local typing into another application and is separate from the opening warning.
-
-For a local source build, the same installer needs no file argument:
+### 1. Install the prerequisites
 
 ```bash
-./scripts/install-macos.sh
+curl -fsSL https://bun.sh/install | bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-The older `scripts/repair-macos-app.sh` remains available only for repairing an incomplete signature on a legacy TypingBot app bundle.
+Restart your terminal afterwards so both tools are on your `PATH`. On Linux, also install the input libraries:
 
-There is no honest Terminal trick that makes an unidentified download universally trusted. Warning-free double-click installation on unmanaged Macs requires an Apple Developer ID certificate and Apple notarization; organization-managed Macs may impose additional policy. Those private credentials are intentionally not stored in the repository.
+```bash
+sudo apt-get install -y libx11-dev libxtst-dev libxkbcommon-dev libxdo-dev
+```
 
-### Windows and Linux
+### 2. Build and run
 
-1. Open the repository's **Releases** page.
-2. Download the newest file for your computer:
-   - Windows: the `.msi` or setup `.exe`
-   - Linux: the `.AppImage` or `.deb`
-3. Open the download and install TypingBot.
-4. On Linux, input simulation is most reliable in an X11 session.
+```bash
+git clone https://github.com/Euler2718e/typingbot.git
+cd typingbot
+bun install
+bun start
+```
+
+The first `bun start` compiles the native engine, which takes a few minutes. Later launches open the terminal interface immediately.
+
+### 3. Grant Accessibility permission
+
+TypingBot cannot type into other applications, or absorb your keystrokes, until the operating system allows it. On macOS the permission belongs to **the terminal application you launched it from** — Terminal, iTerm2, or your editor's integrated terminal — not to a program named TypingBot.
+
+Open **System Settings → Privacy & Security → Accessibility**, enable your terminal application, then quit and reopen it. macOS only applies the change to newly started processes.
+
+Linux desktop input and global shortcuts require an X11 session; Wayland remains a limited platform.
+
+### Updating
+
+```bash
+git pull
+bun install
+bun run engine:build
+bun start
+```
+
+`bun start` compiles the engine only when the binary is missing, so after any change to the Rust sources run `bun run engine:build` yourself or you will keep running the previous engine.
 
 ## Use
 
-1. Open TypingBot from the system tray or menu bar.
-2. Paste your assignment or writing brief into **Writing request**.
-3. Select **Copy prompt** and send the copied text to ChatGPT, Claude, Gemini, or another capable model.
-4. Copy only the JSON object returned by the model.
-5. Paste it into **Model output** in TypingBot.
-6. Choose the total duration, average WPM, countdown, and phase percentages.
-7. Open **Feel** to choose steady, natural, or reflective rhythm and tune speed variation, hesitation, corrected-typo frequency, correction delay, and pause-before-edit timing.
-8. Select **Validate and play**.
-9. During the countdown, focus the destination textbox.
+1. Run `bun start` from the project directory.
+2. Paste the assignment or brief into **Writing request**.
+3. Press `Ctrl+G` to copy the complete model prompt.
+4. Send it to ChatGPT, Claude, Gemini, or another capable model.
+5. Paste only the returned JSON into **Performance JSON**.
+6. Configure duration, WPM, countdown, phase allocation, rhythm, variation, hesitation, typo behavior, correction delay, edit pause, thinking depth, correction travel speed, and keyboard absorption.
+7. Press `Ctrl+V` to validate without starting, or `Ctrl+Enter` to validate and play.
+8. During the countdown, switch to the destination textbox.
 
-TypingBot hides its window, captures the foreground application as the destination, then begins. Switching to another application pauses the session. Refocus the original application and use `Cmd/Ctrl + Alt + Space` or the app controls to resume.
+The **total time** field sets how long the whole performance lasts (default 60 minutes); the session paces every phase to fill it and stays busy for the full duration.
 
-Physical keyboard input is never blocked. Do not type into the destination during playback because TypingBot cannot reliably inspect arbitrary third-party textbox contents.
+The terminal may remain behind the destination application. The native engine continues running and reports status back to the terminal. Returning to TypingBot does not alter the document, but leaving the locked destination during playback pauses the session until it is explicitly resumed.
 
-The **Revision depth** control changes the copied model prompt. Deep mode requests substantially more sentence rewrites, discarded lines, paragraph deletion, and material movement; it does not simply slow down the same final-text append.
+### Controls
+
+| Key | Action |
+|---|---|
+| `Tab` / `Shift+Tab` | Move between fields |
+| `Ctrl+Up` / `Ctrl+Down` | Scroll the stacked workspace in narrow terminals |
+| `Ctrl+G` | Copy the complete model prompt |
+| `Ctrl+V` | Validate the performance |
+| `Ctrl+Enter` | Validate and start playback |
+| `Ctrl+Space` | Pause or resume from the terminal |
+| `Cmd/Ctrl+Alt+Space` | Pause or resume globally |
+| `Ctrl+X` | Stop playback (works globally during playback) |
+| `Ctrl+C` | Stop the engine and quit cleanly |
+
+While a performance is playing, these controls work from any application:
+
+| Key | Action |
+|---|---|
+| `Esc` | Pause playback |
+| `Ctrl+Enter` | Resume a paused performance |
+| `Ctrl+X` | Stop the performance |
+| `Cmd/Ctrl+Alt+Space` | Toggle pause and resume |
+
+When keyboard absorption is on, every other key you press is swallowed so it cannot reach the destination document. Turn absorption off in **timing + feel → keyboard** to leave your keyboard live during playback.
 
 ## Performance language
 
@@ -88,42 +107,21 @@ The model returns a constrained JSON document rather than raw keyboard instructi
 
 Read the [performance-format reference](docs/performance-format.md) or open the [complete example](examples/demo.performance.json).
 
-## Privacy and security
+## Development
 
-- Prompt construction happens in the desktop UI.
-- TypingBot contacts no model and has no HTTP dependency.
-- Pasted scripts and settings are stored only in the local WebView profile.
-- Scripts cannot access the filesystem, shell, clipboard, or network.
-- Physical keystrokes are not recorded, absorbed, or transmitted.
+```bash
+bun test               # unit tests
+bun run check          # typecheck and cargo check
+bun run engine:build   # rebuild the native engine
+```
+
+## Privacy and safety
+
+- Prompt construction and performance validation are local.
+- TypingBot makes no model or HTTP request.
+- Performance scripts cannot access the filesystem, shell, clipboard, or network.
+- Physical keystrokes are never recorded or transmitted. When absorption is enabled they are discarded locally so they cannot reach the destination; the engine never inspects or stores them.
 - Focus loss pauses external input before the next action.
-
-## Build from source
-
-Requirements: [Bun](https://bun.sh/), stable [Rust](https://rustup.rs/), and the [Tauri system prerequisites](https://v2.tauri.app/start/prerequisites/) for your operating system.
-
-```bash
-git clone https://github.com/Euler2718e/typingbot.git
-cd typingbot
-bun install
-bun test
-bun run tauri build
-```
-
-Development mode:
-
-```bash
-bun run tauri dev
-```
-
-## Architecture
-
-- `src/core/` defines prompt generation and deterministic browser-side validation.
-- `src-tauri/src/model.rs` repeats security-critical validation at the native boundary.
-- `src-tauri/src/session.rs` owns timing, focus locking, pause control, and the internal document mirror.
-- `src-tauri/src/input.rs` translates safe edit operations into local keyboard events.
-- `.github/workflows/` tests all desktop platforms and creates draft installer releases.
-
-The reasoning behind the composition and platform choices is summarized in [design research](docs/research.md).
 
 ## License
 

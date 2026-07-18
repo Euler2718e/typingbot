@@ -7,21 +7,23 @@ on:
       - "v*"
 
 jobs:
-  publish:
-    permissions:
-      contents: write
+  build:
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-14
-            args: --target aarch64-apple-darwin
-          - os: macos-13
-            args: --target x86_64-apple-darwin
-          - os: windows-latest
-            args: ""
+            artifact: typingbot-macos-arm64
+            kind: unix
+          - os: macos-15-intel
+            artifact: typingbot-macos-x64
+            kind: unix
           - os: ubuntu-22.04
-            args: ""
+            artifact: typingbot-linux-x64
+            kind: unix
+          - os: windows-2022
+            artifact: typingbot-windows-x64
+            kind: windows
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -29,24 +31,67 @@ jobs:
         with:
           bun-version: 1.3.14
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
-      - name: Install Linux system dependencies
-        if: matrix.os == 'ubuntu-22.04'
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
+      - name: Install Linux input dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxtst-dev libxkbcommon-dev libxdo-dev
       - run: bun install --frozen-lockfile
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: bun test
+      - run: bun run check:tui
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - run: cargo build --release --manifest-path src-tauri/Cargo.toml --bin typingbot-engine
+      - run: bun run tui:build
+      - name: Package Unix terminal release
+        if: matrix.kind == 'unix'
+        shell: bash
+        run: |
+          mkdir -p package
+          cp dist/typingbot package/typingbot
+          cp src-tauri/target/release/typingbot-engine package/typingbot-engine
+          cp README.md package/README.md
+          chmod 755 package/typingbot package/typingbot-engine
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            cp scripts/install-terminal.sh package/install-terminal.sh
+            chmod 755 package/install-terminal.sh
+            codesign --force --timestamp=none --sign - package/typingbot
+            codesign --force --timestamp=none --sign - package/typingbot-engine
+            codesign --verify --strict package/typingbot
+            codesign --verify --strict package/typingbot-engine
+          fi
+          tar -czf "${{ matrix.artifact }}.tar.gz" -C package .
+          shasum -a 256 "${{ matrix.artifact }}.tar.gz" > "${{ matrix.artifact }}.tar.gz.sha256"
+      - name: Package Windows terminal release
+        if: matrix.kind == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package | Out-Null
+          Copy-Item dist/typingbot.exe package/typingbot.exe
+          Copy-Item src-tauri/target/release/typingbot-engine.exe package/typingbot-engine.exe
+          Copy-Item README.md package/README.md
+          Compress-Archive -Path package/* -DestinationPath "${{ matrix.artifact }}.zip"
+          (Get-FileHash "${{ matrix.artifact }}.zip" -Algorithm SHA256).Hash.ToLower() + "  ${{ matrix.artifact }}.zip" | Out-File "${{ matrix.artifact }}.zip.sha256" -Encoding ascii
+      - uses: actions/upload-artifact@v4
         with:
-          tagName: v__VERSION__
-          releaseName: TypingBot v__VERSION__
-          releaseBody: Download the installer for your operating system below. Unsigned development builds may require your operating system's manual open flow.
-          releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.args }}
-      - name: Attach terminal-first macOS installer
-        if: matrix.os == 'macos-14'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "$GITHUB_REF_NAME" scripts/install-macos.sh --clobber
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}.tar.gz
+            ${{ matrix.artifact }}.tar.gz.sha256
+            ${{ matrix.artifact }}.zip
+            ${{ matrix.artifact }}.zip.sha256
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: typingbot-*
+          merge-multiple: true
+          path: release
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: release/*

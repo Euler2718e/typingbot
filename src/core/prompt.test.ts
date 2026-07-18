@@ -2,8 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { PERFORMANCE_PROMPT, revisionInstruction } from "./prompt";
 
 describe("performance prompt", () => {
-  test("requires recursive transparent drafting", () => {
-    expect(PERFORMANCE_PROMPT).toContain("Draft recursively in blocks of one to four sentences");
+  test("requires structured transparent drafting", () => {
+    expect(PERFORMANCE_PROMPT).toContain("Draft section by section");
+    expect(PERFORMANCE_PROMPT).toContain("STRUCTURED outline");
     expect(PERFORMANCE_PROMPT).toContain("transparent automation");
     expect(PERFORMANCE_PROMPT).toContain("must end with a document byte-for-byte equal to finalText");
   });

@@ -1,141 +1,124 @@
-use global_hotkey::{
-    hotkey::{Code, HotKey, Modifiers},
-    GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState,
-};
 use std::{
     io::{self, BufRead, BufReader, Write},
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     thread,
-};
-use tao::{
-    event::Event,
-    event_loop::{ControlFlow, EventLoopBuilder},
+    time::Duration,
 };
 use typingbot_lib::{
+    keyboard::run_absorb_grab,
     model::{validate_and_simulate, validate_settings},
     protocol::{EngineCommand, EngineEvent},
     session::{ControlState, SessionController, StatusEmitter},
 };
-
-#[derive(Debug)]
-enum RuntimeEvent {
-    Command(EngineCommand),
-    InvalidCommand(String),
-    InputClosed,
-}
 
 type EventWriter = Arc<Mutex<io::Stdout>>;
 
 fn main() {
     let writer = Arc::new(Mutex::new(io::stdout()));
     let controller = SessionController::default();
-    let mut event_loop = EventLoopBuilder::<RuntimeEvent>::with_user_event().build();
 
-    #[cfg(target_os = "macos")]
-    {
-        use tao::platform::macos::{ActivationPolicy, EventLoopExtMacOS};
-        event_loop.set_activation_policy(ActivationPolicy::Accessory);
-        event_loop.set_dock_visibility(false);
-        event_loop.set_activate_ignoring_other_apps(false);
+    // The keyboard grab reports its own pause/resume/stop back to the terminal.
+    let control_writer = writer.clone();
+    let on_control: Arc<dyn Fn(ControlState) + Send + Sync> = Arc::new(move |state| {
+        emit_event(
+            &control_writer,
+            &EngineEvent::Control {
+                state: control_state_name(state).into(),
+            },
+        );
+    });
+
+    // Commands arrive as newline-delimited JSON on stdin and are handled on a
+    // dedicated thread so the main thread is free to own the keyboard grab.
+    spawn_command_reader(controller.clone(), writer.clone());
+
+    // The grab blocks for the life of the process on success and returns
+    // immediately on failure. Announce readiness from a short-lived probe so the
+    // reported state reflects whether the grab actually installed.
+    let grab_failed = Arc::new(AtomicBool::new(false));
+    spawn_ready_probe(writer.clone(), grab_failed.clone());
+
+    match run_absorb_grab(controller, on_control) {
+        Ok(()) => {
+            // The grab loop ended unexpectedly; keep the process alive so the
+            // command reader can still drive validation and playback.
+            park_forever();
+        }
+        Err(error) => {
+            grab_failed.store(true, Ordering::SeqCst);
+            emit_event(
+                &writer,
+                &EngineEvent::Ready {
+                    protocol: 1,
+                    global_shortcut: false,
+                    warning: Some(format!(
+                        "keyboard absorption and global controls unavailable: {error}"
+                    )),
+                },
+            );
+            park_forever();
+        }
     }
+}
 
-    let proxy = event_loop.create_proxy();
+fn spawn_command_reader(controller: SessionController, writer: EventWriter) {
     thread::spawn(move || {
         let input = BufReader::new(io::stdin());
         for line in input.lines() {
-            let event = match line {
+            match line {
                 Ok(line) if line.trim().is_empty() => continue,
                 Ok(line) => match serde_json::from_str::<EngineCommand>(&line) {
-                    Ok(command) => RuntimeEvent::Command(command),
-                    Err(error) => RuntimeEvent::InvalidCommand(error.to_string()),
+                    Ok(command) => {
+                        if handle_command(&controller, &writer, command) {
+                            output_flush(&writer);
+                            std::process::exit(0);
+                        }
+                    }
+                    Err(error) => emit_event(
+                        &writer,
+                        &EngineEvent::failure(0, format!("invalid command: {error}")),
+                    ),
                 },
-                Err(error) => RuntimeEvent::InvalidCommand(error.to_string()),
-            };
-            if proxy.send_event(event).is_err() {
-                return;
-            }
-        }
-        let _ = proxy.send_event(RuntimeEvent::InputClosed);
-    });
-
-    let (hotkey_manager, shortcut_registered, warning) =
-        register_global_shortcut(controller.clone(), writer.clone());
-    emit_event(
-        &writer,
-        &EngineEvent::Ready {
-            protocol: 1,
-            global_shortcut: shortcut_registered,
-            warning,
-        },
-    );
-
-    event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
-        let Event::UserEvent(runtime_event) = event else {
-            return;
-        };
-        match runtime_event {
-            RuntimeEvent::Command(command) => {
-                let should_exit = handle_command(&controller, &writer, command);
-                if should_exit {
-                    *control_flow = ControlFlow::Exit;
+                Err(error) => {
+                    emit_event(
+                        &writer,
+                        &EngineEvent::failure(0, format!("input error: {error}")),
+                    );
+                    break;
                 }
             }
-            RuntimeEvent::InvalidCommand(error) => {
-                emit_event(
-                    &writer,
-                    &EngineEvent::failure(0, format!("invalid command: {error}")),
-                );
-            }
-            RuntimeEvent::InputClosed => {
-                let _ = controller.stop();
-                *control_flow = ControlFlow::Exit;
-            }
         }
-        let _keep_manager_alive = &hotkey_manager;
+        let _ = controller.stop();
+        output_flush(&writer);
+        std::process::exit(0);
     });
 }
 
-fn register_global_shortcut(
-    controller: SessionController,
-    writer: EventWriter,
-) -> (Option<GlobalHotKeyManager>, bool, Option<String>) {
-    let manager = match GlobalHotKeyManager::new() {
-        Ok(manager) => manager,
-        Err(error) => {
-            return (
-                None,
-                false,
-                Some(format!("global pause shortcut unavailable: {error}")),
-            )
+fn spawn_ready_probe(writer: EventWriter, grab_failed: Arc<AtomicBool>) {
+    thread::spawn(move || {
+        // The grab installs (or fails) synchronously; give it a moment, then if
+        // it did not fail, report the keyboard controls as armed.
+        thread::sleep(Duration::from_millis(300));
+        if !grab_failed.load(Ordering::SeqCst) {
+            emit_event(
+                &writer,
+                &EngineEvent::Ready {
+                    protocol: 1,
+                    global_shortcut: true,
+                    warning: None,
+                },
+            );
         }
-    };
-    let modifiers = if cfg!(target_os = "macos") {
-        Modifiers::SUPER | Modifiers::ALT
-    } else {
-        Modifiers::CONTROL | Modifiers::ALT
-    };
-    let shortcut = HotKey::new(Some(modifiers), Code::Space);
-    if let Err(error) = manager.register(shortcut) {
-        return (
-            Some(manager),
-            false,
-            Some(format!("global pause shortcut unavailable: {error}")),
-        );
+    });
+}
+
+fn park_forever() -> ! {
+    loop {
+        thread::sleep(Duration::from_secs(3600));
     }
-    GlobalHotKeyEvent::set_event_handler(Some(move |event: GlobalHotKeyEvent| {
-        if event.id == shortcut.id() && event.state == HotKeyState::Pressed {
-            if let Ok(state) = controller.toggle_pause() {
-                emit_event(
-                    &writer,
-                    &EngineEvent::Control {
-                        state: control_state_name(state).into(),
-                    },
-                );
-            }
-        }
-    }));
-    (Some(manager), true, None)
 }
 
 fn handle_command(
@@ -184,6 +167,12 @@ fn emit_event(writer: &EventWriter, event: &EngineEvent) {
             let _ = writeln!(output);
             let _ = output.flush();
         }
+    }
+}
+
+fn output_flush(writer: &EventWriter) {
+    if let Ok(mut output) = writer.lock() {
+        let _ = output.flush();
     }
 }
 
