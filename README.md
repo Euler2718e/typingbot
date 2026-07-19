@@ -5,12 +5,10 @@ TypingBot is a fully local bot that writes text through a visible process of pla
 It is built for transparent writing demonstrations, accessibility workflows, and screen recordings. It does not claim that automated text was written by a person.
 
 <p align="center">
-  <a href="assets/typingbot-demo.mp4">
-    <img src="assets/typingbot-banner.png" alt="Watch the TypingBot demo" width="800">
-  </a>
+  <img src="assets/typingbot-demo-inline.gif" alt="TypingBot writing-process demo" width="768">
 </p>
 
-<p align="center"><strong>▶ Click to watch the 35-second demo</strong> · 1080p · no audio</p>
+<p align="center"><strong>35-second demo</strong> · plays inline in browsers on mobile and desktop · <a href="assets/typingbot-demo.mp4?raw=1">open the full-quality 1080p video</a> · no audio</p>
 
 ## What it does
 
