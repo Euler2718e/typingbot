@@ -16,19 +16,27 @@ import { copyToClipboard } from "./clipboard";
 import { EngineClient, type EngineCallbacks } from "./engine";
 import { saveFormState, type TuiFormState } from "./state";
 
+// A terminal-native approximation of Apple's layered materials. OpenTUI does
+// not expose composited translucency, so depth comes from restrained surfaces,
+// soft borders, and a single system-blue interaction color.
 const color = {
-  bg: "#111311",
-  panel: "#191c19",
-  panelAlt: "#20241f",
-  border: "#3b4139",
-  muted: "#838b7f",
-  text: "#e7ebe2",
-  accent: "#b8d891",
-  amber: "#d8bd7f",
-  error: "#d7877f",
-  planning: "#9dbb88",
-  drafting: "#d1b47b",
-  polishing: "#91adb8",
+  bg: "#0d0d0f",
+  chrome: "#141416",
+  panel: "#1c1c1e",
+  panelAlt: "#242426",
+  focused: "#163a5f",
+  border: "#3a3a3c",
+  borderSoft: "#2c2c2e",
+  muted: "#a1a1a6",
+  subdued: "#636366",
+  text: "#f5f5f7",
+  accent: "#0a84ff",
+  success: "#30d158",
+  amber: "#ffd60a",
+  error: "#ff453a",
+  planning: "#0a84ff",
+  drafting: "#0a84ff",
+  polishing: "#0a84ff",
 } as const;
 
 const idleStatus: SessionStatus = {
@@ -276,30 +284,60 @@ export function TypingBotApp({
   const selectedStyle = form.promptPreferences.writingStyle === null
     ? null
     : getWritingStyle(form.promptPreferences.writingStyle);
-  const bodyHeight = Math.max(12, height - 9);
-  const setupStep = selectedStyle === null
-    ? "1 choose style"
+  const headerHeight = wide ? 4 : 3;
+  const footerHeight = wide ? 2 : 3;
+  const bodyHeight = Math.max(12, height - headerHeight - footerHeight - 3);
+  const workflowState = selectedStyle === null
+    ? "Choose a writing style"
     : !form.assignment.trim()
-      ? "2 add writing request"
+      ? "Add a writing request"
       : !form.performance.trim()
-        ? "3 copy prompt · paste json"
+        ? "Copy the prompt, then paste the performance"
         : validation?.valid
-          ? "4 ready to play"
-          : "4 verify performance";
+          ? "Ready to play"
+          : "Verify the performance";
+  const statusDetail = active ? status.message : `${workflowState}  ${notice}`;
 
   return (
     <box width="100%" height="100%" flexDirection="column" backgroundColor={color.bg}>
-      <box height={3} flexShrink={0} paddingLeft={2} paddingRight={2} flexDirection="row" justifyContent="space-between" alignItems="center" backgroundColor={color.panel}>
-        <text fg={color.text}><strong>typingbot</strong><span fg={color.muted}> / terminal writing playback</span></text>
-        <text fg={engineReady ? color.accent : color.amber}>{engineReady ? "● engine" : "○ engine"}<span fg={color.muted}>  {selectedStyle ? `style ${String(selectedStyle.id).padStart(2, "0")}` : "style required"}  {shortcutReady ? "global controls armed" : "terminal controls"}</span></text>
+      <box
+        height={headerHeight}
+        flexShrink={0}
+        paddingLeft={2}
+        paddingRight={2}
+        flexDirection="row"
+        justifyContent="space-between"
+        alignItems="center"
+        backgroundColor={color.chrome}
+        border={["bottom"]}
+        borderColor={color.borderSoft}
+      >
+        <box flexDirection="column">
+          <text fg={color.text}><strong>TypingBot</strong></text>
+          {wide ? <text fg={color.muted}>Local writing playback</text> : null}
+        </box>
+        <box flexDirection="row" gap={1} alignItems="center">
+          <StatusChip
+            label={engineReady ? (wide ? "Engine ready" : "Ready") : (wide ? "Engine offline" : "Offline")}
+            tone={engineReady ? color.success : color.amber}
+          />
+          <StatusChip
+            label={selectedStyle ? `Style ${String(selectedStyle.id).padStart(2, "0")}` : "Style required"}
+            tone={selectedStyle ? color.accent : color.amber}
+          />
+          {wide ? <text fg={color.muted}>{shortcutReady ? "Global controls" : "Terminal controls"}</text> : null}
+        </box>
       </box>
 
-      <box height={3} flexShrink={0} paddingLeft={2} paddingRight={2} flexDirection="column" border={["bottom"]} borderColor={color.border}>
+      <box height={3} flexShrink={0} paddingLeft={2} paddingRight={2} flexDirection="column" border={["bottom"]} borderColor={color.borderSoft}>
         <box flexDirection="row" justifyContent="space-between">
-          <text fg={statusColor(status.state)}><strong>{statusLabel(status)}</strong><span fg={color.muted}>  {setupStep} · {notice}</span></text>
-          <text fg={color.text}>{formatDuration(status.elapsedMs)}  <span fg={color.muted}>{progress}%</span></text>
+          <text fg={statusColor(status.state)}>
+            <strong>{statusLabel(status)}</strong>
+            <span fg={color.muted}>  {statusDetail}</span>
+          </text>
+          <text fg={color.text}>{formatDuration(status.elapsedMs)}  <span fg={color.muted}>{progress}%{busy ? "  Working" : ""}</span></text>
         </box>
-        <text fg={status.phase ? phaseColor(status.phase) : color.border}>{progressRail(progress, Math.max(18, width - 4))}</text>
+        <text fg={status.phase ? phaseColor(status.phase) : color.borderSoft}>{progressRail(progress, Math.max(18, width - 4))}</text>
       </box>
 
       <WorkspaceFrame wide={wide} bodyHeight={bodyHeight} scrollRef={workspaceRef}>
@@ -307,23 +345,30 @@ export function TypingBotApp({
           width={wide ? "62%" : "100%"}
           height={wide ? "100%" : Math.max(14, bodyHeight * 2)}
           border
-          borderColor={color.border}
-          title=" compose "
+          borderStyle="rounded"
+          borderColor={color.borderSoft}
+          title=" Workflow "
+          backgroundColor={color.panel}
           padding={1}
           flexDirection="column"
         >
           <box
-            height={compact ? 5 : 6}
+            height={5}
             flexShrink={0}
             border
-            borderColor={selectedStyle ? color.accent : color.amber}
-            title=" step 1 · writing style (required) "
+            borderStyle="rounded"
+            borderColor={selectedStyle ? color.accent : color.border}
+            backgroundColor={color.chrome}
+            title=" Writing style "
             paddingLeft={1}
             paddingRight={1}
             flexDirection="column"
           >
-            <box height={1} flexDirection="row" alignItems="center">
-              <text fg={selectedStyle ? color.accent : color.amber}><strong>STYLE </strong></text>
+            <box height={1} flexDirection="row" justifyContent="space-between" alignItems="center">
+              <text fg={selectedStyle ? color.success : color.amber}>
+                <strong>{selectedStyle ? "Selected" : "Required"}</strong>
+              </text>
+              <box flexDirection="row" alignItems="center">
               <input
                 ref={styleRef}
                 focused={focusIndex === 0}
@@ -334,7 +379,7 @@ export function TypingBotApp({
                 textColor={color.text}
                 focusedTextColor={color.text}
                 backgroundColor={color.panelAlt}
-                focusedBackgroundColor="#30362d"
+                focusedBackgroundColor={color.focused}
                 cursorColor={color.accent}
                 onInput={(raw) => {
                   const value = Number(raw);
@@ -348,27 +393,27 @@ export function TypingBotApp({
                   setValidation(null);
                 }}
               />
-              <text fg={color.muted}> / 30  </text>
-              <text fg={selectedStyle ? color.text : color.amber}>
-                <strong>{selectedStyle?.name ?? "choose a number before prompt + play"}</strong>
-              </text>
+                <text fg={color.muted}> of 30</text>
+              </box>
             </box>
-            <text fg={color.muted}>{selectedStyle?.summary ?? "Each number has its own planning, drafting, revision, and final voice."}</text>
-            {!compact ? <text fg={color.muted}>tab moves through fields · ctrl+g builds a style-aware prompt</text> : null}
+            <text fg={selectedStyle ? color.text : color.muted}>
+              <strong>{selectedStyle?.name ?? "Choose a number before creating or playing"}</strong>
+            </text>
+            <text fg={color.muted}>{selectedStyle?.summary ?? "Each number changes the complete writing process."}</text>
           </box>
           <box height={1} flexDirection="row" justifyContent="space-between">
-            <text fg={color.text}><strong>step 2 · writing request</strong></text>
-            <text fg={selectedStyle ? color.muted : color.amber}>ctrl+g copy prompt</text>
+            <text fg={color.text}><strong>Writing request</strong></text>
+            <text fg={selectedStyle ? color.accent : color.amber}>Ctrl+G Copy prompt</text>
           </box>
           <textarea
             ref={assignmentRef}
             initialValue={form.assignment}
             focused={focusIndex === 1}
-            height={compact ? 3 : 4}
+            height={3}
             wrapMode="word"
             placeholder="Paste the assignment, brief, or writing request"
             backgroundColor={color.panelAlt}
-            focusedBackgroundColor="#272c25"
+            focusedBackgroundColor={color.focused}
             textColor={color.text}
             focusedTextColor={color.text}
             cursorColor={color.accent}
@@ -377,7 +422,7 @@ export function TypingBotApp({
               assignment: assignmentRef.current?.plainText ?? current.assignment,
             }))}
           />
-          <text fg={color.muted}>revision depth</text>
+          <text fg={color.muted}>Revision depth</text>
           <select
             focused={focusIndex === 2}
             height={3}
@@ -385,8 +430,8 @@ export function TypingBotApp({
             selectedIndex={revisionOptions.findIndex((option) => option.value === form.promptPreferences.revisionDensity)}
             showDescription={false}
             wrapSelection
-            backgroundColor={color.panel}
-            selectedBackgroundColor={color.panelAlt}
+            backgroundColor={color.chrome}
+            selectedBackgroundColor={color.focused}
             selectedTextColor={color.accent}
             onChange={(_, option) => option && setForm((current) => ({
               ...current,
@@ -394,23 +439,25 @@ export function TypingBotApp({
             }))}
           />
           <box height={1} marginTop={1} flexDirection="row" justifyContent="space-between">
-            <text fg={color.text}><strong>step 3 · performance json</strong></text>
+            <text fg={color.text}><strong>Performance JSON</strong></text>
             <text fg={validation?.valid ? color.accent : validation ? color.error : color.muted}>
-              {validation?.valid ? "verified" : validation ? "attention" : `${form.performance.length} chars`}
+              {validation?.valid ? "Verified" : validation ? "Needs attention" : `${form.performance.length} characters`}
             </text>
           </box>
           <textarea
             ref={performanceRef}
             initialValue={form.performance}
             focused={focusIndex === 3}
-            height={compact ? 7 : 9}
+            height={wide ? undefined : compact ? 7 : 9}
+            minHeight={wide ? 5 : undefined}
+            flexGrow={wide ? 1 : 0}
             wrapMode="char"
             placeholder={'{ "version": "1.0", "finalText": "..." }'}
             backgroundColor={color.panelAlt}
-            focusedBackgroundColor="#272c25"
-            textColor="#d9ded4"
+            focusedBackgroundColor={color.focused}
+            textColor={color.text}
             focusedTextColor={color.text}
-            cursorColor={color.amber}
+            cursorColor={color.accent}
             onContentChange={() => {
               setValidation(null);
               setForm((current) => ({
@@ -425,26 +472,29 @@ export function TypingBotApp({
           width={wide ? "38%" : "100%"}
           height={wide ? "100%" : Math.max(30, bodyHeight * 2)}
           border
-          borderColor={color.border}
-          title=" timing + feel "
+          borderStyle="rounded"
+          borderColor={color.borderSoft}
+          title=" Session "
+          backgroundColor={color.panel}
           padding={1}
           flexDirection="column"
         >
           <scrollbox ref={timingRef} flexGrow={1} flexDirection="column">
-          <text fg={color.text}><strong>session</strong><span fg={color.muted}>  target runtime and base cadence</span></text>
-          <NumberField index={4} focusIndex={focusIndex} label="total time" suffix="min" value={form.settings.durationMinutes} onValue={(value) => setSettings({ durationMinutes: clamp(value, 1, 480) })} />
-          <NumberField index={5} focusIndex={focusIndex} label="base speed" suffix="wpm" value={form.settings.wpm} onValue={(value) => setSettings({ wpm: clamp(value, 20, 220) })} />
-          <NumberField index={6} focusIndex={focusIndex} label="focus window" suffix="sec" value={form.settings.countdownSeconds} onValue={(value) => setSettings({ countdownSeconds: clamp(value, 3, 30) })} />
+          <SettingsHeader title="Timing" detail="Runtime and cadence" />
+          <NumberField index={4} focusIndex={focusIndex} label="Total time" suffix="min" value={form.settings.durationMinutes} onValue={(value) => setSettings({ durationMinutes: clamp(value, 1, 480) })} />
+          <NumberField index={5} focusIndex={focusIndex} label="Base speed" suffix="wpm" value={form.settings.wpm} onValue={(value) => setSettings({ wpm: clamp(value, 20, 220) })} />
+          <NumberField index={6} focusIndex={focusIndex} label="Focus window" suffix="sec" value={form.settings.countdownSeconds} onValue={(value) => setSettings({ countdownSeconds: clamp(value, 3, 30) })} />
 
           <box height={1} marginTop={1} flexDirection="row" justifyContent="space-between">
-            <text fg={color.text}><strong>process allocation</strong></text>
+            <text fg={color.text}><strong>Process</strong><span fg={color.muted}>  Phase allocation</span></text>
             <text fg={phaseTotal === 100 ? color.accent : color.error}>{phaseTotal}%</text>
           </box>
-          <NumberField index={7} focusIndex={focusIndex} label="planning" suffix="%" value={form.settings.planningPercent} tint={color.planning} onValue={(value) => setSettings({ planningPercent: clamp(value, 0, 100) })} />
-          <NumberField index={8} focusIndex={focusIndex} label="drafting" suffix="%" value={form.settings.draftingPercent} tint={color.drafting} onValue={(value) => setSettings({ draftingPercent: clamp(value, 0, 100) })} />
-          <NumberField index={9} focusIndex={focusIndex} label="polishing" suffix="%" value={form.settings.polishingPercent} tint={color.polishing} onValue={(value) => setSettings({ polishingPercent: clamp(value, 0, 100) })} />
+          <NumberField index={7} focusIndex={focusIndex} label="Planning" suffix="%" value={form.settings.planningPercent} tint={color.planning} onValue={(value) => setSettings({ planningPercent: clamp(value, 0, 100) })} />
+          <NumberField index={8} focusIndex={focusIndex} label="Drafting" suffix="%" value={form.settings.draftingPercent} tint={color.drafting} onValue={(value) => setSettings({ draftingPercent: clamp(value, 0, 100) })} />
+          <NumberField index={9} focusIndex={focusIndex} label="Polishing" suffix="%" value={form.settings.polishingPercent} tint={color.polishing} onValue={(value) => setSettings({ polishingPercent: clamp(value, 0, 100) })} />
 
-          <text fg={color.text} marginTop={1}><strong>rhythm</strong><span fg={color.muted}>  actual keystroke behavior</span></text>
+          <SettingsHeader title="Typing behavior" detail="Rhythm and corrections" />
+          <text fg={color.muted}>Cadence profile</text>
           <select
             focused={focusIndex === 10}
             height={3}
@@ -452,53 +502,85 @@ export function TypingBotApp({
             selectedIndex={rhythmOptions.findIndex((option) => option.value === form.settings.rhythmProfile)}
             showDescription={false}
             wrapSelection
-            backgroundColor={color.panel}
-            selectedBackgroundColor={color.panelAlt}
+            backgroundColor={color.chrome}
+            selectedBackgroundColor={color.focused}
             selectedTextColor={color.accent}
             onChange={(_, option) => option && setSettings({ rhythmProfile: option.value as RhythmProfile })}
           />
-          <select
-            focused={focusIndex === 11}
-            height={2}
-            options={booleanOptions}
-            selectedIndex={form.settings.correctedTypos ? 0 : 1}
-            showDescription={false}
-            wrapSelection
-            backgroundColor={color.panel}
-            selectedBackgroundColor={color.panelAlt}
-            selectedTextColor={color.accent}
-            onChange={(_, option) => option && setSettings({ correctedTypos: Boolean(option.value) })}
-          />
-          <NumberField index={12} focusIndex={focusIndex} label="speed variation" suffix="%" value={form.settings.variationPercent} onValue={(value) => setSettings({ variationPercent: clamp(value, 0, 100) })} />
-          <NumberField index={13} focusIndex={focusIndex} label="hesitation" suffix="%" value={form.settings.hesitationPercent} onValue={(value) => setSettings({ hesitationPercent: clamp(value, 0, 100) })} />
-          <NumberField index={14} focusIndex={focusIndex} label="corrected typos" suffix="/1k" value={form.settings.typosPerThousand} onValue={(value) => setSettings({ typosPerThousand: clamp(value, 0, 50) })} />
-          <NumberField index={15} focusIndex={focusIndex} label="correction delay" suffix="ms" value={form.settings.correctionDelayMs} onValue={(value) => setSettings({ correctionDelayMs: clamp(value, 40, 1200) })} />
-          <NumberField index={16} focusIndex={focusIndex} label="pause before edits" suffix="ms" value={form.settings.editPauseMs} onValue={(value) => setSettings({ editPauseMs: clamp(value, 0, 3000) })} />
-          <NumberField index={17} focusIndex={focusIndex} label="thinking depth" suffix="%" value={form.settings.thinkingIntensity} tint={color.planning} onValue={(value) => setSettings({ thinkingIntensity: clamp(value, 0, 100) })} />
-          <NumberField index={18} focusIndex={focusIndex} label="correction travel" suffix="ms" value={form.settings.correctionNavMs} onValue={(value) => setSettings({ correctionNavMs: clamp(value, 4, 200) })} />
+          <box height={2} flexDirection="row" justifyContent="space-between" alignItems="center">
+            <text fg={color.muted}>Repair mistakes</text>
+            <select
+              focused={focusIndex === 11}
+              width={14}
+              height={2}
+              options={booleanOptions}
+              selectedIndex={form.settings.correctedTypos ? 0 : 1}
+              showDescription={false}
+              wrapSelection
+              backgroundColor={color.chrome}
+              selectedBackgroundColor={color.focused}
+              selectedTextColor={color.accent}
+              onChange={(_, option) => option && setSettings({ correctedTypos: Boolean(option.value) })}
+            />
+          </box>
+          <NumberField index={12} focusIndex={focusIndex} label="Speed variation" suffix="%" value={form.settings.variationPercent} onValue={(value) => setSettings({ variationPercent: clamp(value, 0, 100) })} />
+          <NumberField index={13} focusIndex={focusIndex} label="Hesitation" suffix="%" value={form.settings.hesitationPercent} onValue={(value) => setSettings({ hesitationPercent: clamp(value, 0, 100) })} />
+          <NumberField index={14} focusIndex={focusIndex} label="Corrected typos" suffix="/1k" value={form.settings.typosPerThousand} onValue={(value) => setSettings({ typosPerThousand: clamp(value, 0, 50) })} />
+          <NumberField index={15} focusIndex={focusIndex} label="Correction delay" suffix="ms" value={form.settings.correctionDelayMs} onValue={(value) => setSettings({ correctionDelayMs: clamp(value, 40, 1200) })} />
+          <NumberField index={16} focusIndex={focusIndex} label="Pause before edits" suffix="ms" value={form.settings.editPauseMs} onValue={(value) => setSettings({ editPauseMs: clamp(value, 0, 3000) })} />
+          <NumberField index={17} focusIndex={focusIndex} label="Thinking depth" suffix="%" value={form.settings.thinkingIntensity} tint={color.planning} onValue={(value) => setSettings({ thinkingIntensity: clamp(value, 0, 100) })} />
+          <NumberField index={18} focusIndex={focusIndex} label="Correction travel" suffix="ms" value={form.settings.correctionNavMs} onValue={(value) => setSettings({ correctionNavMs: clamp(value, 4, 200) })} />
 
-          <text fg={color.text} marginTop={1}><strong>keyboard</strong><span fg={color.muted}>  input while playing</span></text>
-          <select
-            focused={focusIndex === 19}
-            height={2}
-            options={absorbOptions}
-            selectedIndex={form.settings.absorbKeystrokes ? 0 : 1}
-            showDescription={false}
-            wrapSelection
-            backgroundColor={color.panel}
-            selectedBackgroundColor={color.panelAlt}
-            selectedTextColor={color.accent}
-            onChange={(_, option) => option && setSettings({ absorbKeystrokes: Boolean(option.value) })}
-          />
-          <text fg={color.muted}>command shortcuts stay live · esc pauses · ctrl+x stops</text>
+          <SettingsHeader title="Keyboard" detail="Input during playback" />
+          <box height={2} flexDirection="row" justifyContent="space-between" alignItems="center">
+            <text fg={color.muted}>Keystroke handling</text>
+            <select
+              focused={focusIndex === 19}
+              width={14}
+              height={2}
+              options={absorbOptions}
+              selectedIndex={form.settings.absorbKeystrokes ? 0 : 1}
+              showDescription={false}
+              wrapSelection
+              backgroundColor={color.chrome}
+              selectedBackgroundColor={color.focused}
+              selectedTextColor={color.accent}
+              onChange={(_, option) => option && setSettings({ absorbKeystrokes: Boolean(option.value) })}
+            />
+          </box>
+          <text fg={color.subdued}>Command shortcuts stay live. Esc pauses. Ctrl+X stops.</text>
           <input focused={focusIndex === 20} value="" width={1} maxLength={0} textColor={color.panel} cursorColor={color.panel} />
           </scrollbox>
         </box>
       </WorkspaceFrame>
 
-      <box height={2} flexShrink={0} paddingLeft={2} paddingRight={2} flexDirection="row" justifyContent="space-between" alignItems="center" backgroundColor={color.panel}>
-        <text fg={color.muted}>tab fields  {!wide ? <><span fg={color.text}>ctrl+↑/↓</span> scroll  </> : null}<span fg={color.text}>ctrl+g</span> prompt  <span fg={color.text}>ctrl+v</span> verify  <span fg={color.accent}>ctrl+enter</span> play</text>
-        <text fg={active ? color.amber : color.muted}><span fg={color.text}>ctrl+space</span> {status.state === "paused" ? "resume" : "pause"}  <span fg={color.error}>ctrl+x</span> stop  <span fg={color.text}>ctrl+c</span> quit {busy ? " · working" : ""}</text>
+      <box
+        height={footerHeight}
+        flexShrink={0}
+        paddingLeft={2}
+        paddingRight={2}
+        flexDirection={wide ? "row" : "column"}
+        justifyContent={wide ? "space-between" : "flex-start"}
+        alignItems={wide ? "center" : "flex-start"}
+        backgroundColor={color.chrome}
+        border={["top"]}
+        borderColor={color.borderSoft}
+      >
+        {wide ? (
+          <>
+            <text fg={color.muted}>
+              <span fg={color.text}>Tab</span> Navigate  <span fg={color.text}>Ctrl+G</span> Prompt  <span fg={color.text}>Ctrl+V</span> Verify  <span fg={color.accent}><strong>Ctrl+Enter Play</strong></span>
+            </text>
+            <text fg={active ? color.amber : color.muted}>
+              <span fg={color.text}>Ctrl+Space</span> {status.state === "paused" ? "Resume" : "Pause"}  <span fg={color.error}>Ctrl+X Stop</span>  <span fg={color.text}>Ctrl+C Quit</span>
+            </text>
+          </>
+        ) : (
+          <>
+            <text fg={color.muted}><span fg={color.text}>Tab</span> Navigate  <span fg={color.text}>Ctrl+↑/↓</span> Scroll  <span fg={color.text}>Ctrl+G</span> Prompt  <span fg={color.text}>Ctrl+V</span> Verify</text>
+            <text fg={color.muted}><span fg={color.accent}><strong>Ctrl+Enter Play</strong></span>  <span fg={color.text}>Ctrl+Space</span> {status.state === "paused" ? "Resume" : "Pause"}  <span fg={color.error}>Ctrl+X Stop</span>  <span fg={color.text}>Ctrl+C Quit</span></text>
+          </>
+        )}
       </box>
     </box>
   );
@@ -523,6 +605,22 @@ function WorkspaceFrame({
     padding: 1,
   };
   return wide ? <box {...layout}>{children}</box> : <scrollbox ref={scrollRef} {...layout}>{children}</scrollbox>;
+}
+
+function StatusChip({ label, tone }: { label: string; tone: string }) {
+  return (
+    <box height={1} paddingLeft={1} paddingRight={1} backgroundColor={color.panelAlt}>
+      <text fg={tone}>● <span fg={color.text}>{label}</span></text>
+    </box>
+  );
+}
+
+function SettingsHeader({ title, detail }: { title: string; detail: string }) {
+  return (
+    <box height={1} marginTop={1} flexDirection="row">
+      <text fg={color.text}><strong>{title}</strong><span fg={color.muted}>  {detail}</span></text>
+    </box>
+  );
 }
 
 function NumberField({
@@ -555,7 +653,7 @@ function NumberField({
           textColor={color.text}
           focusedTextColor={color.text}
           backgroundColor={color.panelAlt}
-          focusedBackgroundColor="#30362d"
+          focusedBackgroundColor={color.focused}
           cursorColor={color.accent}
           onInput={(raw) => {
             const parsed = Number(raw);
@@ -569,15 +667,18 @@ function NumberField({
 }
 
 function statusLabel(status: SessionStatus): string {
-  if (status.phase) return `${status.phase} · ${status.actionIndex + 1}/${Math.max(status.actionCount, 1)}`;
+  if (status.phase) {
+    const phase = `${status.phase[0]?.toUpperCase() ?? ""}${status.phase.slice(1)}`;
+    return `${phase} ${status.actionIndex + 1}/${Math.max(status.actionCount, 1)}`;
+  }
   const labels: Record<SessionStatus["state"], string> = {
-    idle: "ready",
-    countdown: "choose destination",
-    running: "playing",
-    paused: "paused",
-    completed: "complete",
-    stopped: "stopped",
-    error: "attention",
+    idle: "Ready",
+    countdown: "Choose destination",
+    running: "Playing",
+    paused: "Paused",
+    completed: "Complete",
+    stopped: "Stopped",
+    error: "Attention",
   };
   return labels[status.state];
 }
