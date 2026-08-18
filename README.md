@@ -1,9 +1,6 @@
 # TypingBot
 
-TypingBot is a fully local bot that writes text through a visible process of planning, drafting, restructuring, and polishing. Give an LLM a writing assignment, paste its validated performance into TypingBot, and watch the document develop inside your chosen textbox instead of appearing all at once.
-
-It is built for transparent writing demonstrations, accessibility workflows, and screen recordings. It does not claim that automated text was written by a person.
-
+TypingBot is a fully local bot that writes text through a visible process of planning, drafting, restructuring, and polishing. Give an LLM a writing assignment, paste its response (json) into TypingBot, and watch the document develop inside your chosen textbox instead of appearing all at once.
 <p align="center">
   <img src="assets/typingbot-demo-inline.gif" alt="TypingBot writing-process demo" width="768">
 </p>
@@ -13,7 +10,7 @@ It is built for transparent writing demonstrations, accessibility workflows, and
 ## What it does
 
 - Runs entirely inside a focused OpenTUI terminal workspace. There is no account, cloud database, WebView, or required runtime network connection.
-- Offers 30 distinct writing styles. Each style has its own planning method, drafting pattern, revision behavior, and final voice, and you must choose one before generating or playing a performance.
+- Offers 30 distinct writing styles. Each style has its own planning method, drafting pattern, revision behavior, and final voice, and you must choose one before generating or playing a performance. This ensures that every response from the same assignment will its distinct text, with distinct planning and drafting. 
 - Builds a detailed model prompt from your selected style, writing request, revision depth, duration, phase allocation, rhythm, hesitation, typing speed, correction behavior, and other session settings.
 - Works through visible phases. Planning begins as rough notes and abandoned directions. Drafting grows in blocks, moves ideas around, and replaces weak passages. Polishing corrects the final structure, wording, grammar, and punctuation.
 - Varies typing speed through bursts, hesitation, punctuation pauses, corrected transient typos, and deliberate pauses before edits.
@@ -27,7 +24,7 @@ It is built for transparent writing demonstrations, accessibility workflows, and
 1. Choose a writing style from 1 to 30.
 2. Add the writing request and configure the session.
 3. Press `Ctrl+G` and send the copied prompt to ChatGPT, Claude, Gemini, or another capable model.
-4. Paste the returned JSON into TypingBot, validate it, and start playback.
+4. Paste the returned JSON into TypingBot, start playback and find your textbox within 30 seconds.
 
 The model never controls your computer. It only returns a constrained JSON performance. TypingBot simulates every action locally and refuses to start unless the actions produce `finalText` exactly.
 
